@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Correção de Provas — Odontologia</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+<header>
+  <h1>🦷 Correção de Provas — Odontologia</h1>
+  <nav>
+    <button class="tab active" data-tab="provas">Provas</button>
+    <button class="tab" data-tab="responder">Responder</button>
+    <button class="tab" data-tab="smart">🔍 Correção inteligente</button>
+    <button class="tab" data-tab="materias">📚 Matérias</button>
+    <button class="tab" data-tab="seminario">🎓 Seminário</button>
+    <button class="tab" data-tab="xray">🩻 Raio-X</button>
+    <button class="tab" data-tab="resultados">Resultados</button>
+  </nav>
+</header>
+
+<main>
+  <!-- PROVAS -->
+  <section id="tab-provas" class="panel">
+    <h2>Provas cadastradas</h2>
+    <div id="exam-list" class="cards"></div>
+    <h3>Nova prova</h3>
+    <form id="exam-form" class="card form">
+      <label>Título <input name="title" required maxlength="120" placeholder="Ex.: Simulado — Anestesiologia"></label>
+      <label>Descrição <input name="description" maxlength="300" placeholder="Opcional"></label>
+      <button type="submit">Criar prova</button>
+    </form>
+    <div id="exam-detail" class="hidden">
+      <h3 id="exam-detail-title"></h3>
+      <div id="question-list"></div>
+      <h4>Adicionar questão</h4>
+      <form id="question-form" class="card form">
+        <label>Tipo
+          <select name="type" id="q-type">
+            <option value="objetiva">Objetiva (múltipla escolha)</option>
+            <option value="discursiva">Discursiva</option>
+          </select>
+        </label>
+        <label>Enunciado <textarea name="statement" required rows="3"></textarea></label>
+        <div id="q-objetiva-fields">
+          <label>Alternativas (uma por linha, na ordem A–E)
+            <textarea name="options" rows="5" placeholder="Primeira alternativa&#10;Segunda alternativa&#10;..."></textarea>
+          </label>
+          <label>Gabarito (letra)
+            <select name="answer_key">
+              <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+            </select>
+          </label>
+        </div>
+        <div id="q-discursiva-fields" class="hidden">
+          <label>Resposta modelo <textarea name="model_answer" rows="4" placeholder="Texto de referência para a correção"></textarea></label>
+          <label>Palavras-chave (separadas por vírgula — se vazio, extraídas da resposta modelo)
+            <input name="keywords" placeholder="miose, pupila, toxicidade">
+          </label>
+        </div>
+        <label>Peso <input name="weight" type="number" min="0.5" step="0.5" value="1"></label>
+        <button type="submit">Adicionar questão</button>
+      </form>
+    </div>
+  </section>
+
+  <!-- RESPONDER -->
+  <section id="tab-responder" class="panel hidden">
+    <h2>Responder prova</h2>
+    <p class="meta">Precisa revisar a matéria antes? <a href="#" id="go-materias">📚 Abrir matérias de apoio</a></p>
+    <div class="card form">
+      <h3>💡 Resposta sintetizada</h3>
+      <p class="meta">Tem uma dúvida? Digite e receba um resumo direto, pesquisado na internet.</p>
+      <label>Sua dúvida <textarea id="quick-q" rows="2" placeholder="Ex.: O que é curva de Spee?"></textarea></label>
+      <div class="row-actions"><button type="button" id="quick-ask">Gerar resposta sintetizada</button></div>
+      <div class="ocr-status" id="quick-prog"></div>
+      <div id="quick-result"></div>
+    </div>
+    <div class="card form">
+      <label>Prova <select id="answer-exam"></select></label>
+      <label>Nome <input id="answer-name" placeholder="Seu nome (opcional)"></label>
+    </div>
+    <div id="answer-questions"></div>
+    <button id="submit-answers" class="primary hidden">Enviar e corrigir</button>
+    <div id="answer-result"></div>
+  </section>
+
+  <!-- CORREÇÃO INTELIGENTE -->
+  <section id="tab-smart" class="panel hidden">
+    <h2>🔍 Correção inteligente</h2>
+    <p class="meta">Envie <strong>foto</strong>, <strong>texto</strong> ou <strong>raio-X</strong> das questões. O sistema lê o texto (OCR), <strong>pesquisa na internet</strong>, cruza as fontes e sugere a melhor resposta.</p>
+    <div class="card form">
+      <label>Título <input id="smart-title" placeholder="Ex.: Prova de anestesiologia — questões da foto"></label>
+    </div>
+
+    <h3>⚡ Modo automático</h3>
+    <div class="card form">
+      <p class="meta">Selecione <strong>uma ou mais fotos</strong> das questões (ou cole o texto). Assim que as imagens carregarem, o sistema lê, divide e pesquisa <strong>sozinho</strong> — sem precisar clicar em nada. Provas longas são pesquisadas em lotes e <strong>nenhuma questão fica de fora</strong>.</p>
+      <label>Fotos das questões <input type="file" id="auto-imgs" accept="image/*" multiple></label>
+      <label>Tipo das imagens
+        <select id="auto-kind">
+          <option value="foto">Fotos de questões (o sistema lê o texto)</option>
+          <option value="raio-x">Raios-X (anexados como referência visual; cole o texto das questões abaixo)</option>
+        </select>
+      </label>
+      <div id="auto-thumbs" class="thumbs"></div>
+      <label>Ou cole o texto das questões aqui
+        <textarea id="auto-text" rows="4" placeholder="Cole as questões numeradas aqui (opcional, se não houver fotos)"></textarea>
+      </label>
+      <div class="row-actions">
+        <button type="button" class="primary" id="auto-go">⚡ Extrair, dividir e corrigir automaticamente</button>
+      </div>
+      <div class="ocr-status" id="auto-progress"></div>
+    </div>
+
+    <h3>Modo manual (opcional)</h3>
+    <p class="meta">Monte as questões uma a uma. O botão de extração lê <strong>todas</strong> as fotos de uma vez e preenche os enunciados (detectando objetivas e alternativas). Na hora de pesquisar, <strong>todas</strong> as questões preenchidas são analisadas — nenhuma fica de fora.</p>
+    <div id="smart-items"></div>
+    <div class="row-actions">
+      <button type="button" class="secondary" id="smart-add">+ Adicionar questão</button>
+      <button type="button" class="secondary" id="smart-extract-all">📷 Extrair texto de todas as fotos</button>
+    </div>
+    <div class="ocr-status" id="smart-extract-progress"></div>
+
+    <button id="smart-submit" class="primary">Pesquisar na internet e corrigir</button>
+    <div class="ocr-status" id="smart-progress"></div>
+    <div id="smart-result"></div>
+
+    <h3>Histórico de pesquisas</h3>
+    <div id="research-history" class="cards"></div>
+  </section>
+
+  <!-- MATÉRIAS -->
+  <section id="tab-materias" class="panel hidden">
+    <h2>📚 Matérias — apoio ao estudo</h2>
+    <p class="meta">Biblioteca das disciplinas do curso. Guarde questões com respostas e anexe PDFs ou imagens: o sistema lê o texto e salva tudo como material de apoio.</p>
+    <div class="card form">
+      <label>🔎 Buscar em questões e materiais <input id="study-search" placeholder="Ex.: miose, prótese parcial fixa..."></label>
+      <div id="study-search-result"></div>
+    </div>
+    <div id="subject-grid" class="cards"></div>
+    <div id="subject-detail"></div>
+  </section>
+
+  <!-- SEMINÁRIO -->
+  <section id="tab-seminario" class="panel hidden">
+    <h2>🎓 Seminário</h2>
+    <p class="meta">Digite o tema: o sistema pesquisa, monta os slides com imagens, dados e explicações. Você revisa, ajusta e, depois de aprovar, exporta em PDF ou PowerPoint.</p>
+    <div class="card form">
+      <label>Tema do seminário <input id="sem-theme" placeholder="Ex.: Prótese parcial fixa" maxlength="120"></label>
+      <div class="sem-opts">
+        <label>Páginas <input id="sem-pages" type="number" min="4" max="10" value="7"></label>
+        <label>Estilo <select id="sem-style">
+          <option value="moderno">Moderno e leve</option>
+          <option value="formal">Formal e elegante</option>
+          <option value="animado">Animado e divertido</option>
+        </select></label>
+      </div>
+      <div class="row-actions"><button type="button" id="sem-generate" class="primary">Gerar seminário</button></div>
+      <div class="ocr-status" id="sem-prog"></div>
+    </div>
+    <div id="sem-editor"></div>
+    <h3>Meus seminários</h3>
+    <div id="sem-list" class="cards"></div>
+  </section>
+
+  <!-- ANÁLISE DE RAIO-X -->
+  <section id="tab-xray" class="panel hidden">
+    <h2>🩻 Análise de Raio-X</h2>
+    <p class="meta">Envie a imagem do raio-X (arquivo ou foto da tela/chapa), ajuste a visualização e siga o roteiro de leitura para montar uma análise descritiva de estudo. Arquivos DICOM (.dcm) abrem nos visualizadores profissionais listados abaixo. Aqui, envie a imagem exportada (PNG/JPG) ou fotografe a tela.</p>
+
+    <div class="card form">
+      <h3>1. Imagem</h3>
+      <label>Enviar imagem ou tirar foto <input type="file" id="xray-file" accept="image/*" capture="environment"></label>
+      <div class="ocr-status" id="xray-prog"></div>
+      <div id="xray-auto"></div>
+      <div id="xray-viewer-wrap" class="hidden">
+        <img id="xray-img" class="img-preview" style="max-height:420px" alt="Raio-X">
+        <div class="card form" style="margin-top:8px">
+          <h4>Ferramentas de visualização</h4>
+          <label>Zoom <input type="range" id="xray-zoom" min="1" max="3" step="0.1" value="1"></label>
+          <label>Contraste <input type="range" id="xray-contrast" min="50" max="200" value="100"></label>
+          <label>Brilho <input type="range" id="xray-bright" min="50" max="200" value="100"></label>
+          <label style="font-weight:400"><input type="checkbox" id="xray-invert"> Inverter (negativo)</label>
+          <div class="row-actions"><button type="button" class="secondary" id="xray-reset">Restaurar</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card form hidden" id="xray-form-card">
+      <h3>2. Roteiro de leitura</h3>
+      <label>Tipo de exame
+        <select id="xray-type">
+          <option>Panorâmica</option>
+          <option>Periapical</option>
+          <option>Interproximal (bite-wing)</option>
+          <option>Oclusal</option>
+          <option>Telerradiografia</option>
+        </select>
+      </label>
+      <p><strong>Qualidade técnica</strong></p>
+      <div id="xray-quality"></div>
+      <p><strong>Avaliação por região</strong></p>
+      <div id="xray-regions"></div>
+      <p><strong>Achados</strong></p>
+      <div id="xray-findings"></div>
+      <label>Impressão descritiva <textarea id="xray-notes" rows="3" placeholder="Descreva o que observou..."></textarea></label>
+      <div class="row-actions">
+        <button type="button" id="xray-report-btn" class="secondary">Gerar relatório</button>
+        <button type="button" id="xray-save" class="primary">Salvar análise</button>
+      </div>
+      <div id="xray-report-view"></div>
+    </div>
+
+    <h3>Minhas análises</h3>
+    <div id="xray-list" class="cards"></div>
+    <div id="xray-detail"></div>
+
+    <h3>Sistemas profissionais de análise</h3>
+    <p class="meta">Ferramentas reais usadas na clínica e no ensino para abrir DICOM e analisar radiografias com IA. A análise desta página é um roteiro de estudo e não substitui o laudo de um radiologista.</p>
+    <h4>IA para radiografias odontológicas (com aprovação regulatória)</h4>
+    <div class="cards">
+      <div class="card">
+        <h4>Pearl — Second Opinion</h4>
+        <p class="meta">IA que analisa radiografias em tempo real e destaca cáries, cálculo, perda óssea e radiolucidez periapical. Uma das primeiras com liberação do FDA.</p>
+        <p><a href="https://www.hellopearl.com/products/second-opinion" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+      <div class="card">
+        <h4>Overjet</h4>
+        <p class="meta">Plataforma de IA com liberação do FDA para detectar cáries, cálculo e perda óssea, com imagens anotadas.</p>
+        <p><a href="https://www.overjet.com/" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+      <div class="card">
+        <h4>VideaHealth</h4>
+        <p class="meta">IA para detecção de cáries, problemas periodontais e lesões endodônticas, com liberação do FDA.</p>
+        <p><a href="https://www.videa.ai/" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+      <div class="card">
+        <h4>Denti.AI</h4>
+        <p class="meta">IA odontológica com liberação do FDA (2023) para análise de radiografias.</p>
+        <p><a href="https://www.denti.ai/" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+    </div>
+    <h4>Visualizadores DICOM (abrem .dcm, tomografias e raios-X digitais)</h4>
+    <div class="cards">
+      <div class="card">
+        <h4>Weasis</h4>
+        <p class="meta">Grátis e de código aberto, roda em Windows, macOS e Linux. Boa cobertura do padrão DICOM.</p>
+        <p><a href="https://weasis.org" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+      <div class="card">
+        <h4>3D Slicer</h4>
+        <p class="meta">Plataforma gratuita de análise de imagens médicas com segmentação e reconstrução 3D. Ótimo para estudo e pesquisa.</p>
+        <p><a href="https://www.slicer.org/" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+      <div class="card">
+        <h4>Horos</h4>
+        <p class="meta">Grátis e de código aberto para macOS. Popular no ensino.</p>
+        <p><a href="https://horosproject.org" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+      <div class="card">
+        <h4>RadiAnt</h4>
+        <p class="meta">Rápido e completo para Windows, com versão de teste gratuita.</p>
+        <p><a href="https://radiantviewer.com" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+      <div class="card">
+        <h4>MicroDicom</h4>
+        <p class="meta">Leve e grátis para Windows (uso não comercial).</p>
+        <p><a href="https://www.microdicom.com/" target="_blank" rel="noopener">Site oficial</a></p>
+      </div>
+    </div>
+
+    <h3>⚖️ Cruzamento: esta imagem em cada software</h3>
+    <p class="meta">Escolha o tipo do exame para ver o que cada software faz com uma imagem como a sua — quais aceitam o exame, o que detectam e quanto custam.</p>
+    <div class="card form">
+      <label>Tipo de exame
+        <select id="xray-xref-type">
+          <option>Panorâmica</option>
+          <option>Periapical</option>
+          <option>Interproximal (bite-wing)</option>
+          <option>Oclusal</option>
+          <option>Telerradiografia</option>
+        </select>
+      </label>
+    </div>
+    <div id="xray-xref"></div>
+  </section>
+
+  <!-- RESULTADOS -->
+  <section id="tab-resultados" class="panel hidden">
+    <h2>Correções realizadas</h2>
+    <div id="submission-list" class="cards"></div>
+    <div id="submission-detail"></div>
+    <h3>Pesquisas inteligentes</h3>
+    <p class="meta">Resultados da 🔍 Correção inteligente (objetivas e discursivas pesquisadas na internet).</p>
+    <div id="research-list-tab" class="cards"></div>
+    <div id="research-detail-tab"></div>
+  </section>
+</main>
+
+<script src="app.js"></script>
+<footer>ideia e criação: <strong>HarrisonCosta2026</strong></footer>
+</body>
+</html>

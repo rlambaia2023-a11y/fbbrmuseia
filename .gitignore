@@ -1,0 +1,27 @@
+# Dependências
+node_modules/
+
+# Banco de dados local (dados de estudo pessoais)
+data/
+
+# Uploads (imagens, PDFs e arquivos do usuário)
+uploads/
+
+# Saídas geradas pelos scripts
+scripts/out/
+
+# Logs
+logs/
+*.log
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Arquivos temporários
+*.tmp
+correcao.tar.gz

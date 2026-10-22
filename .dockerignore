@@ -1,0 +1,9 @@
+node_modules/
+data/
+uploads/
+scripts/out/
+logs/
+.git/
+.gitignore
+correcao.tar.gz
+*.log

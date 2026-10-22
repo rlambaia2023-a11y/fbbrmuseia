@@ -11,7 +11,7 @@ import { researchQuestion, sleep } from "./research.js";
 import { generateSeminar, exportSeminarPdf, exportSeminarPptx } from "./seminar.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = path.join(__dirname, "uploads");
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, "uploads");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({

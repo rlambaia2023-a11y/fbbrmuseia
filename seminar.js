@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { searchWeb, pageEvidence, humanizeAnswer, keywords, sleep } from "./research.js";
 
 const UA = "odonto-seminarios/1.0 (estudo)";
-const UPLOADS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "uploads");
+const UPLOADS_DIR = process.env.UPLOAD_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), "uploads");
 
 // Busca imagens livres no Wikimedia Commons (sem chave, licenca aberta).
 // Testa varias formulacoes (tema completo, tema + "dentistry"/"dental" e as

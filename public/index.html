@@ -183,7 +183,7 @@
     <div class="card form">
       <label>Tema do seminário <input id="sem-theme" placeholder="Ex.: Prótese parcial fixa" maxlength="120"></label>
       <div class="sem-opts">
-        <label>Páginas <input id="sem-pages" type="number" min="4" max="10" value="7"></label>
+        <label>Páginas <input id="sem-pages" type="number" min="4" max="14" value="7"></label>
         <label>Estilo <select id="sem-style">
           <option value="moderno">Moderno e leve</option>
           <option value="formal">Formal e elegante</option>
@@ -244,6 +244,26 @@
         <button type="button" id="xray-save" class="primary">Salvar análise</button>
       </div>
       <div id="xray-report-view"></div>
+    </div>
+
+    <div class="card form">
+      <h3>🖥️ Abrir no Weasis</h3>
+      <p class="meta">Se este exame estiver num servidor PACS (ex.: dcm4chee-arc-light), gere o link que abre direto no <strong>Weasis</strong> instalado no seu PC. Usa os mesmos modelos de URL da integração oficial do dcm4chee (IID_PATIENT_URL / IID_STUDY_URL).</p>
+      <label>Buscar por
+        <select id="weasis-kind">
+          <option value="patient">Paciente (ID)</option>
+          <option value="study">Estudo (UID)</option>
+        </select>
+      </label>
+      <label>URL base do DICOMweb (QIDO-RS) <input id="weasis-base" placeholder="https://pacs.exemplo.com:8443/dcm4chee-arc/aets/DCM4CHEE/rs"></label>
+      <label id="weasis-patient-wrap">ID do paciente <input id="weasis-patient" placeholder="Ex.: 12345"></label>
+      <label id="weasis-study-wrap" class="hidden">UID do estudo <input id="weasis-study" placeholder="Ex.: 1.2.840.113619.2.1..."></label>
+      <label>Token de acesso (opcional) <input id="weasis-token" placeholder="Bearer token, se o servidor exigir"></label>
+      <div class="row-actions">
+        <button type="button" id="weasis-gen" class="secondary">Gerar link do Weasis</button>
+      </div>
+      <div id="weasis-out"></div>
+      <p class="meta">Requer o Weasis instalado no PC. No Windows, links muito longos podem ser cortados pelo navegador — nesse caso use o Firefox.</p>
     </div>
 
     <h3>Minhas análises</h3>

@@ -1060,7 +1060,7 @@ $("#sem-generate").addEventListener("click", async () => {
   btn.disabled = true;
   prog.textContent = "Pesquisando o tema, buscando imagens e montando os slides... pode levar cerca de 1 minuto.";
   try {
-    const slideCount = Math.min(10, Math.max(4, parseInt($("#sem-pages").value, 10) || 7));
+    const slideCount = Math.min(14, Math.max(4, parseInt($("#sem-pages").value, 10) || 7));
     const style = $("#sem-style").value || "moderno";
     const s = await api("/api/seminars/generate", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme, slideCount, style }),
@@ -1551,3 +1551,41 @@ async function loadStats() {
 }
 document.querySelector('[data-tab="provas"]').addEventListener("click", loadStats);
 loadStats();
+
+// ---------- Weasis: gerador de link para análise no Weasis (DICOMweb) ----------
+// Modelos oficiais da integração do dcm4chee-arc-light com o Weasis
+// (IID_PATIENT_URL / IID_STUDY_URL). Os {{placeholders}} são preenchidos abaixo.
+const WEASIS_TPL_PATIENT = 'weasis://?$dicom:rs --url "{{qidoBaseURL}}{{qidoBasePath}}" -r "patientID={{patientID}}" --query-ext "&includedefaults=false" -H "Authorization: Bearer {{access_token}}"';
+const WEASIS_TPL_STUDY = 'weasis://?$dicom:rs --url "{{qidoBaseURL}}{{qidoBasePath}}" -r "studyUID={{studyUID}}" --query-ext "&includedefaults=false" -H "Authorization: Bearer {{access_token}}"';
+
+$("#weasis-kind").addEventListener("change", (ev) => {
+  const byStudy = ev.target.value === "study";
+  $("#weasis-patient-wrap").classList.toggle("hidden", byStudy);
+  $("#weasis-study-wrap").classList.toggle("hidden", !byStudy);
+});
+
+$("#weasis-gen").addEventListener("click", () => {
+  const out = $("#weasis-out");
+  const base = $("#weasis-base").value.trim().replace(/\/+$/, "");
+  const token = $("#weasis-token").value.trim();
+  const byStudy = $("#weasis-kind").value === "study";
+  const idVal = byStudy ? $("#weasis-study").value.trim() : $("#weasis-patient").value.trim();
+  if (!base || !idVal) {
+    out.innerHTML = '<p class="meta">Preencha a URL base e o ' + (byStudy ? "UID do estudo." : "ID do paciente.") + "</p>";
+    return;
+  }
+  let url = (byStudy ? WEASIS_TPL_STUDY : WEASIS_TPL_PATIENT)
+    .replace("{{qidoBaseURL}}", base)
+    .replace("{{qidoBasePath}}", "")
+    .replace(byStudy ? "{{studyUID}}" : "{{patientID}}", idVal);
+  if (token) url = url.replace("{{access_token}}", token);
+  else url = url.replace(/ -H "Authorization: Bearer \{\{access_token\}\}"/, "");
+  out.innerHTML =
+    '<p class="meta">Link gerado:</p>' +
+    '<p><a class="weasis-link" href="' + esc(url) + '">Abrir no Weasis</a></p>' +
+    '<div class="row-actions"><button type="button" class="secondary" id="weasis-copy">Copiar link</button></div>';
+  $("#weasis-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(url); $("#weasis-copy").textContent = "Copiado!"; }
+    catch (e) { $("#weasis-copy").textContent = "Não copiou — selecione o link acima"; }
+  });
+});

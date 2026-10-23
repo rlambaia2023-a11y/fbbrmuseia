@@ -383,3 +383,27 @@ footer strong { color: var(--purple-dark); }
 .card.form label.chk { display: flex; align-items: center; gap: 10px; font-weight: 500; cursor: pointer; }
 .card.form label.chk input[type="checkbox"] { width: 18px; height: 18px; accent-color: #8e24aa; flex: none; }
 #an-info .feedback, #an-warnings .feedback { margin: 10px 0; }
+
+/* Hamburger (mobile): recolhe o menu por completo */
+.menu-btn { display: none; }
+@media (max-width: 900px) {
+  .sidebar { position: relative; }
+  .menu-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 42px; height: 42px; font-size: 1.35rem; flex: none;
+    background: var(--purple); color: #fff; border: none; border-radius: 12px;
+    cursor: pointer; margin-left: auto;
+  }
+  .menu-btn:active { transform: scale(.94); }
+  .sidebar nav { display: none; }
+  body.menu-open .sidebar nav {
+    display: flex; flex-direction: column; align-items: stretch;
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 60;
+    background: #fff; border-bottom: 1px solid var(--line);
+    box-shadow: 0 12px 24px rgba(42,10,51,.14);
+    padding: 8px 12px 12px; overflow: visible;
+  }
+  body.menu-open .sidebar nav .tab { width: 100%; justify-content: flex-start; }
+  body.menu-open .sidebar nav .tab .lbl { display: inline; }
+  body.menu-open .sidebar nav .tab .ico { width: 36px; height: 36px; }
+}

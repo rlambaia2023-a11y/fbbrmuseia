@@ -1653,3 +1653,18 @@ function anCalc() {
   $("#an-cardio").addEventListener("change", anCalc);
   anCalc();
 })();
+
+/* ---------- Hamburger (mobile): abre/recolhe o menu por completo ---------- */
+(function menuInit() {
+  const btn = $("#menu-btn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const open = document.body.classList.toggle("menu-open");
+    btn.setAttribute("aria-expanded", String(open));
+    btn.textContent = open ? "✕" : "☰";
+    btn.setAttribute("aria-label", open ? "Fechar menu" : "Abrir menu");
+  });
+  document.querySelectorAll("nav .tab").forEach(t => t.addEventListener("click", () => {
+    if (document.body.classList.contains("menu-open")) btn.click();
+  }));
+})();

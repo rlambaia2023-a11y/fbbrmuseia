@@ -9,22 +9,44 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
-<header>
-  <h1>🦷 Correção de Provas — Odontologia</h1>
+<aside class="sidebar">
+  <div class="logo">🦷 odonto<em>provas</em></div>
   <nav>
-    <button class="tab active" data-tab="provas">Provas</button>
-    <button class="tab" data-tab="responder">Responder</button>
-    <button class="tab" data-tab="smart">🔍 Correção inteligente</button>
-    <button class="tab" data-tab="materias">📚 Matérias</button>
-    <button class="tab" data-tab="seminario">🎓 Seminário</button>
-    <button class="tab" data-tab="xray">🩻 Raio-X</button>
-    <button class="tab" data-tab="resultados">Resultados</button>
+    <button class="tab active" data-tab="provas"><span class="ico">📝</span><span class="lbl">Provas</span></button>
+    <button class="tab" data-tab="responder"><span class="ico">✏️</span><span class="lbl">Responder</span></button>
+    <button class="tab" data-tab="smart"><span class="ico">🔍</span><span class="lbl">Correção inteligente</span></button>
+    <button class="tab" data-tab="materias"><span class="ico">📚</span><span class="lbl">Matérias</span></button>
+    <button class="tab" data-tab="seminario"><span class="ico">🎓</span><span class="lbl">Seminário</span></button>
+    <button class="tab" data-tab="xray"><span class="ico">🩻</span><span class="lbl">Raio-X</span></button>
+    <button class="tab" data-tab="resultados"><span class="ico">📊</span><span class="lbl">Resultados</span></button>
   </nav>
-</header>
+  <div class="sidebar-foot">ideia e criação<br><strong>HarrisonCosta2026</strong></div>
+</aside>
+
+<div class="content">
+<div class="topbar">
+  <label class="search"><span>🔎</span><input id="top-search" placeholder="Buscar em matérias, questões e materiais... (Enter)"></label>
+  <span class="top-tag">🦷 Odontologia</span>
+</div>
 
 <main>
   <!-- PROVAS -->
   <section id="tab-provas" class="panel">
+    <div class="hero">
+      <span class="kicker">SUA PLATAFORMA DE ESTUDOS</span>
+      <h2>Estude, responda e <span class="gold">corrija provas</span> de Odontologia</h2>
+      <p>Envie foto ou texto das questões: o sistema lê, pesquisa na internet e sugere a melhor resposta, com fontes e nível de confiança.</p>
+      <div class="cta-row">
+        <button class="btn-gold" id="hero-smart" type="button">⚡ Correção inteligente</button>
+        <button class="btn-ghost" id="hero-materias" type="button">📚 Abrir matérias</button>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="num" id="stat-exams">–</div><div class="lbl">Provas cadastradas</div></div>
+      <div class="stat"><div class="num" id="stat-questions">–</div><div class="lbl">Questões no banco</div></div>
+      <div class="stat"><div class="num" id="stat-subjects">–</div><div class="lbl">Matérias</div></div>
+      <div class="stat"><div class="num" id="stat-research">–</div><div class="lbl">Pesquisas inteligentes</div></div>
+    </div>
     <h2>Provas cadastradas</h2>
     <div id="exam-list" class="cards"></div>
     <h3>Nova prova</h3>
@@ -71,7 +93,7 @@
   <section id="tab-responder" class="panel hidden">
     <h2>Responder prova</h2>
     <p class="meta">Precisa revisar a matéria antes? <a href="#" id="go-materias">📚 Abrir matérias de apoio</a></p>
-    <div class="card form">
+    <div class="card form ia-card">
       <h3>💡 Resposta sintetizada</h3>
       <p class="meta">Tem uma dúvida? Digite e receba um resumo direto, pesquisado na internet.</p>
       <label>Sua dúvida <textarea id="quick-q" rows="2" placeholder="Ex.: O que é curva de Spee?"></textarea></label>
@@ -90,8 +112,17 @@
 
   <!-- CORREÇÃO INTELIGENTE -->
   <section id="tab-smart" class="panel hidden">
-    <h2>🔍 Correção inteligente</h2>
-    <p class="meta">Envie <strong>foto</strong>, <strong>texto</strong> ou <strong>raio-X</strong> das questões. O sistema lê o texto (OCR), <strong>pesquisa na internet</strong>, cruza as fontes e sugere a melhor resposta.</p>
+    <div class="ia-hero">
+      <span class="kicker kicker-purple">CORREÇÃO INTELIGENTE</span>
+      <h2>Tire qualquer dúvida e corrija qualquer prova</h2>
+      <p>Envie <strong>foto</strong>, <strong>texto</strong> ou <strong>raio-X</strong> das questões. O sistema lê o texto (OCR), <strong>pesquisa na internet</strong>, cruza as fontes e sugere a melhor resposta.</p>
+      <p class="sug-title">💡 Experimente colar uma questão como:</p>
+      <div class="sug-row">
+        <button type="button" class="sug-chip" data-sug="1. O que é miose e quais fármacos de uso odontológico podem causá-la?">O que é miose e quais fármacos podem causá-la?</button>
+        <button type="button" class="sug-chip" data-sug="2. Como o pKa do anestésico local influencia o início da anestesia?">Como o pKa influencia o início da anestesia local?</button>
+        <button type="button" class="sug-chip" data-sug="3. Quais são as indicações e contraindicações da prótese parcial fixa?">Quais as indicações da prótese parcial fixa?</button>
+      </div>
+    </div>
     <div class="card form">
       <label>Título <input id="smart-title" placeholder="Ex.: Prova de anestesiologia — questões da foto"></label>
     </div>
@@ -301,7 +332,9 @@
   </section>
 </main>
 
-<script src="app.js"></script>
 <footer>ideia e criação: <strong>HarrisonCosta2026</strong></footer>
+</div><!-- /.content -->
+
+<script src="app.js"></script>
 </body>
 </html>

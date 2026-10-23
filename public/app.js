@@ -1505,3 +1505,49 @@ async function deleteXray(id) {
   await api("/api/xray/" + id, { method: "DELETE" });
   loadXrays();
 }
+
+// ---------- Redesign: atalhos, busca do topo, estatísticas ----------
+// (código próprio; apenas a linguagem visual foi inspirada no ident.com.br)
+function activateTab(name) {
+  const btn = document.querySelector('[data-tab="' + name + '"]');
+  if (btn) btn.click();
+}
+
+$("#hero-smart").addEventListener("click", () => activateTab("smart"));
+$("#hero-materias").addEventListener("click", () => activateTab("materias"));
+
+// Sugestões clicáveis da Correção inteligente: preenchem o campo de texto
+document.querySelectorAll(".sug-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const box = $("#auto-text");
+    box.value = chip.dataset.sug || "";
+    box.scrollIntoView({ behavior: "smooth", block: "center" });
+    box.focus();
+  });
+});
+
+// Busca global do topo: leva para Matérias e executa a busca de estudos
+$("#top-search").addEventListener("keydown", (ev) => {
+  if (ev.key !== "Enter") return;
+  const q = ev.target.value.trim();
+  activateTab("materias");
+  const box = $("#study-search");
+  box.value = q;
+  box.dispatchEvent(new Event("input", { bubbles: true }));
+  setTimeout(() => box.scrollIntoView({ behavior: "smooth", block: "center" }), 150);
+});
+
+// Faixa de estatísticas do início
+async function loadStats() {
+  try {
+    const [exams, subjects, research] = await Promise.all([
+      api("/api/exams"), api("/api/subjects"), api("/api/research"),
+    ]);
+    $("#stat-exams").textContent = exams.length;
+    $("#stat-questions").textContent = exams.reduce((s, e) => s + (e.question_count || 0), 0);
+    $("#stat-subjects").textContent = subjects.length;
+    $("#stat-research").textContent = research.length;
+  } catch (e) { /* mantém "–" até a API responder */ }
+}
+document.querySelector('[data-tab="provas"]').addEventListener("click", loadStats);
+loadStats();

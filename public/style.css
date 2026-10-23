@@ -378,3 +378,8 @@ footer strong { color: var(--purple-dark); }
   text-decoration: none;
 }
 .weasis-link:hover { filter: brightness(1.08); }
+
+/* Calculadora de anestesia */
+.card.form label.chk { display: flex; align-items: center; gap: 10px; font-weight: 500; cursor: pointer; }
+.card.form label.chk input[type="checkbox"] { width: 18px; height: 18px; accent-color: #8e24aa; flex: none; }
+#an-info .feedback, #an-warnings .feedback { margin: 10px 0; }

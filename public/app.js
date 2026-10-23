@@ -1589,3 +1589,67 @@ $("#weasis-gen").addEventListener("click", () => {
     catch (e) { $("#weasis-copy").textContent = "Não copiou — selecione o link acima"; }
   });
 });
+
+/* ---------- Calculadora de anestesia (odontologia) ----------
+   Referência: doses máximas recomendadas (Malamed, Manual de Anestesia Local).
+   Tubete padrão de 1,8 mL. Valores para estudo — confirmar na bula. */
+const ANESTHETICS = [
+  { id: "lido-epi",   name: "Lidocaína 2% + epinefrina 1:100.000",  conc: 2,   mgkg: 7.0, maxmg: 500, epiCart: 0.018, note: "Anestésico mais usado na clínica; bom equilíbrio entre potência e segurança." },
+  { id: "lido-plain", name: "Lidocaína 2% sem vasoconstritor",      conc: 2,   mgkg: 4.4, maxmg: 300, epiCart: 0,     note: "Sem vasoconstritor a absorção é mais rápida: dose máxima menor e duração mais curta." },
+  { id: "mepi-epi",   name: "Mepivacaína 2% + epinefrina 1:100.000", conc: 2,  mgkg: 6.6, maxmg: 400, epiCart: 0.018, note: "Alternativa à lidocaína; vasoconstrição discreta mesmo sem vasoconstritor associado." },
+  { id: "mepi-plain", name: "Mepivacaína 3% sem vasoconstritor",    conc: 3,   mgkg: 6.6, maxmg: 400, epiCart: 0,     note: "Útil quando o vasoconstritor é contraindicado; duração pulpar em torno de 20 a 40 min." },
+  { id: "arti",       name: "Articaína 4% + epinefrina 1:100.000",  conc: 4,   mgkg: 7.0, maxmg: 500, epiCart: 0.018, note: "Alta difusão tecidual; evitar em menores de 4 anos (bula)." },
+  { id: "prilo",      name: "Prilocaína 4% com felipressina",       conc: 4,   mgkg: 6.0, maxmg: 400, epiCart: 0,     note: "Risco de metemoglobinemia: cautela em crianças pequenas, gestantes e anêmicos." },
+  { id: "bupi",       name: "Bupivacaína 0,5% + epinefrina 1:200.000", conc: 0.5, mgkg: 2.0, maxmg: 90, epiCart: 0.009, note: "Longa duração (anestesia pulpar de até 8 h): orientar o paciente contra mordedura de lábio e língua." },
+];
+const fmtBR = (n, d = 1) => Number(n).toFixed(d).replace(".", ",").replace(/,0$/, "");
+
+function anCalc() {
+  const peso = Math.max(3, parseFloat($("#an-peso").value) || 0);
+  const idade = parseFloat($("#an-idade").value) || 0;
+  const cardio = $("#an-cardio").checked;
+  const a = ANESTHETICS.find(x => x.id === $("#an-agente").value) || ANESTHETICS[0];
+  const mgCart = a.conc * 10 * 1.8;                       // mg por tubete (1,8 mL)
+  const doseMg = Math.min(peso * a.mgkg, a.maxmg);         // dose máxima em mg
+  const cartsDose = Math.floor(doseMg / mgCart);           // tubetes pelo anestésico
+  const epiMax = cardio ? 0.04 : 0.2;                     // mg de epinefrina
+  const cartsEpi = a.epiCart > 0 ? Math.floor(epiMax / a.epiCart + 1e-9) : Infinity;
+  const carts = Math.max(0, Math.min(cartsDose, cartsEpi));
+  const totalMg = carts * mgCart;
+  const totalEpi = carts * a.epiCart;
+  const limitante = a.epiCart > 0 && cartsEpi < cartsDose
+    ? "vasoconstritor (epinefrina)" : "dose do anestésico";
+
+  $("#an-dose").textContent = fmtBR(doseMg, 0) + " mg";
+  $("#an-carts").textContent = carts + (carts === 1 ? " tubete" : " tubetes");
+  $("#an-mgcart").textContent = fmtBR(mgCart, mgCart % 1 ? 1 : 0) + " mg";
+  $("#an-epi").textContent = a.epiCart > 0 ? fmtBR(totalEpi, 3) + " mg" : "—";
+
+  let info = `<div class="feedback">Para ${fmtBR(peso, peso % 1 ? 1 : 0)} kg, o limite é de <strong>${carts} ${carts === 1 ? "tubete" : "tubetes"}</strong> `
+    + `(${fmtBR(totalMg, 0)} mg), limitado pela ${limitante}. Cada tubete de 1,8 mL contém ${fmtBR(mgCart, mgCart % 1 ? 1 : 0)} mg do anestésico.`;
+  if (a.epiCart > 0) info += ` Epinefrina total: ${fmtBR(totalEpi, 3)} mg (limite ${fmtBR(epiMax, 2)} mg).`;
+  info += `</div><div class="feedback">${a.note}</div>`;
+  $("#an-info").innerHTML = info;
+
+  const warns = [];
+  if (cardio && a.epiCart > 0) warns.push("Paciente cardiopata: a epinefrina foi limitada a 0,04 mg no total. Monitore pressão e frequência cardíaca.");
+  if (a.id === "arti" && idade < 4) warns.push("Articaína: bula contraindica o uso em menores de 4 anos.");
+  if (a.id === "prilo") warns.push("Prilocaína: risco de metemoglobinemia. Evite doses altas e cautela em crianças pequenas, gestantes e pacientes anêmicos.");
+  if (a.id === "bupi") warns.push("Bupivacaína: anestesia muito prolongada. Oriente o paciente a não morder lábio, língua ou bochecha enquanto durar a dormência.");
+  if (carts === 0) warns.push("Peso muito baixo para este anestésico: nenhum tubete completo cabe na dose máxima. Reavalie a escolha do anestésico.");
+  $("#an-warnings").innerHTML = warns.map(w => `<div class="feedback">⚠️ ${w}</div>`).join("");
+}
+
+(function anInit() {
+  const tb = document.querySelector("#an-table tbody");
+  if (!tb) return;
+  tb.innerHTML = ANESTHETICS.map(a => {
+    const mgCart = a.conc * 10 * 1.8;
+    return `<tr><td>${a.name}</td><td>${fmtBR(a.mgkg, 1)} mg/kg</td><td>${a.maxmg} mg</td>`
+      + `<td>${fmtBR(mgCart, mgCart % 1 ? 1 : 0)} mg</td>`
+      + `<td>${a.epiCart > 0 ? fmtBR(a.epiCart, 3) + " mg" : "—"}</td></tr>`;
+  }).join("");
+  ["an-peso", "an-idade", "an-agente"].forEach(id => $("#" + id).addEventListener("input", anCalc));
+  $("#an-cardio").addEventListener("change", anCalc);
+  anCalc();
+})();

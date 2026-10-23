@@ -18,6 +18,7 @@
     <button class="tab" data-tab="materias"><span class="ico">📚</span><span class="lbl">Matérias</span></button>
     <button class="tab" data-tab="seminario"><span class="ico">🎓</span><span class="lbl">Seminário</span></button>
     <button class="tab" data-tab="xray"><span class="ico">🩻</span><span class="lbl">Raio-X</span></button>
+    <button class="tab" data-tab="anestesia"><span class="ico">💉</span><span class="lbl">Anestesia</span></button>
     <button class="tab" data-tab="resultados"><span class="ico">📊</span><span class="lbl">Resultados</span></button>
   </nav>
   <div class="sidebar-foot">ideia e criação<br><strong>HarrisonCosta2026</strong></div>
@@ -338,6 +339,52 @@
       </label>
     </div>
     <div id="xray-xref"></div>
+  </section>
+
+  <!-- CALCULADORA DE ANESTESIA -->
+  <section id="tab-anestesia" class="panel hidden">
+    <div class="ia-hero">
+      <span class="kicker kicker-purple">CALCULADORA DE ANESTESIA</span>
+      <h2>Dose máxima de anestésico local</h2>
+      <p>Informe o peso do paciente e escolha o anestésico: a calculadora mostra a dose máxima em mg e em tubetes de 1,8 mL, já respeitando o limite de vasoconstritor para cardiopatas.</p>
+    </div>
+    <div class="card form">
+      <h3>Dados do paciente</h3>
+      <label>Peso (kg)
+        <input id="an-peso" type="number" min="3" max="300" step="0.5" value="70">
+      </label>
+      <label>Idade (anos)
+        <input id="an-idade" type="number" min="0" max="120" step="1" value="30">
+      </label>
+      <label class="chk"><input type="checkbox" id="an-cardio"> Paciente cardiopata ou com risco cardiovascular (limita a epinefrina a 0,04 mg)</label>
+      <label>Anestésico
+        <select id="an-agente">
+          <option value="lido-epi">Lidocaína 2% + epinefrina 1:100.000</option>
+          <option value="lido-plain">Lidocaína 2% sem vasoconstritor</option>
+          <option value="mepi-epi">Mepivacaína 2% + epinefrina 1:100.000</option>
+          <option value="mepi-plain">Mepivacaína 3% sem vasoconstritor</option>
+          <option value="arti">Articaína 4% + epinefrina 1:100.000</option>
+          <option value="prilo">Prilocaína 4% com felipressina</option>
+          <option value="bupi">Bupivacaína 0,5% + epinefrina 1:200.000</option>
+        </select>
+      </label>
+    </div>
+    <div class="stats">
+      <div class="stat"><span class="stat-num" id="an-dose">–</span><span class="stat-lbl">Dose máxima (mg)</span></div>
+      <div class="stat"><span class="stat-num" id="an-carts">–</span><span class="stat-lbl">Tubetes máximos (1,8 mL)</span></div>
+      <div class="stat"><span class="stat-num" id="an-mgcart">–</span><span class="stat-lbl">mg por tubete</span></div>
+      <div class="stat"><span class="stat-num" id="an-epi">–</span><span class="stat-lbl">Epinefrina total (mg)</span></div>
+    </div>
+    <div id="an-info"></div>
+    <div id="an-warnings"></div>
+    <h3>Tabela de referência</h3>
+    <div style="overflow-x:auto">
+      <table class="tbl" id="an-table">
+        <thead><tr><th>Anestésico</th><th>mg/kg</th><th>Dose máx.</th><th>mg/tubete</th><th>Epi/tubete</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="meta">Valores de referência para estudo, baseados em Malamed (Manual de Anestesia Local). Tubete padrão de 1,8 mL. Confirme sempre na bula e com o professor: esta calculadora não substitui o julgamento clínico.</p>
   </section>
 
   <!-- RESULTADOS -->

@@ -440,7 +440,7 @@ app.post("/api/seminars/generate", async (req, res) => {
     const style = SEMINAR_STYLE_VALUES.includes(req.body && req.body.style) ? req.body.style : "moderno";
     let slideCount = parseInt(req.body && req.body.slideCount, 10);
     if (!Number.isFinite(slideCount)) slideCount = 7;
-    slideCount = Math.min(10, Math.max(4, slideCount));
+    slideCount = Math.min(14, Math.max(4, slideCount));
     const slides = await generateSeminar(theme, { slideCount, style });
     const r = run("INSERT INTO seminars (theme, slides, status, style) VALUES (?, ?, 'rascunho', ?)", theme, JSON.stringify(slides), style);
     res.status(201).json(buildSeminar(r.lastInsertRowid));

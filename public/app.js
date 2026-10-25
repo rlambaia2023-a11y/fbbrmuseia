@@ -1194,7 +1194,7 @@ function renderSeminarEditor(s) {
       <hr>
       <div class="card" style="margin-top:10px">
         <h4>🎬 Vídeo narrado</h4>
-        <p class="meta">Cria um vídeo com a narração completa dos slides em português, na voz escolhida.</p>
+        <p class="meta">Cria um vídeo com a narração completa dos slides em português. A voz gratuita atual é única (Google); com chave OpenAI, vale a escolha masculina/feminina.</p>
         <div class="row-actions">
           <label>Voz <select id="sem-video-voice">
             <option value="feminina">Feminina</option>
@@ -1365,7 +1365,7 @@ async function createNarratedVideo() {
     const url = URL.createObjectURL(blob);
     $("#sem-video-preview").innerHTML = `<video controls src="${url}" style="width:100%;max-width:720px"></video>`;
     $("#sem-video-download").innerHTML = `<p><a href="${url}" download="seminario-${currentSeminar.id}-narrado.webm"><strong>Baixar vídeo narrado</strong></a></p>`;
-    prog.textContent = "Vídeo pronto!";
+    prog.textContent = r.provider === "openai" ? `Vídeo pronto! Voz: OpenAI (${r.voice}).` : "Vídeo pronto! Voz gratuita (Google).";
   } catch (e) { prog.textContent = e.message; }
   btn.disabled = false;
 }

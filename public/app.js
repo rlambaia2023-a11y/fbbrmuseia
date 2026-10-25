@@ -1191,6 +1191,21 @@ function renderSeminarEditor(s) {
         <button type="button" id="sem-save">Salvar ajustes</button>
         ${s.status !== "aprovado" ? `<button type="button" id="sem-approve" class="primary">Aprovar seminário</button>` : ""}
       </div>
+      <hr>
+      <div class="card" style="margin-top:10px">
+        <h4>🎬 Vídeo narrado</h4>
+        <p class="meta">Cria um vídeo com a narração completa dos slides em português, na voz escolhida.</p>
+        <div class="row-actions">
+          <label>Voz <select id="sem-video-voice">
+            <option value="feminina">Feminina</option>
+            <option value="masculina">Masculina</option>
+          </select></label>
+          <button type="button" id="sem-video">Criar vídeo narrado</button>
+        </div>
+        <div class="ocr-status" id="sem-video-prog"></div>
+        <div id="sem-video-preview"></div>
+        <div id="sem-video-download"></div>
+      </div>
       ${s.status === "aprovado" ? `
         <div class="row-actions">
           <button type="button" id="sem-pdf">Exportar PDF</button>
@@ -1238,6 +1253,8 @@ function renderSeminarEditor(s) {
   const pdfBtn = $("#sem-pdf"), pptxBtn = $("#sem-pptx");
   if (pdfBtn) pdfBtn.addEventListener("click", () => exportSeminar("pdf"));
   if (pptxBtn) pptxBtn.addEventListener("click", () => exportSeminar("pptx"));
+  const videoBtn = $("#sem-video");
+  if (videoBtn) videoBtn.addEventListener("click", createNarratedVideo);
   renderSemOptionPreviews("#sem-ed-");
 }
 
@@ -1252,6 +1269,105 @@ async function exportSeminar(format) {
     $("#sem-download").innerHTML = `<p><a href="${esc(r.path)}" target="_blank" rel="noopener"><strong>Baixar ${format === "pdf" ? "PDF" : "PowerPoint"}</strong></a></p>`;
     prog.textContent = "";
   } catch (e) { prog.textContent = e.message; }
+}
+
+// ---------- 🎬 Vídeo narrado do seminário ----------
+// O servidor gera o áudio (OpenAI TTS) por slide; o navegador monta o vídeo:
+// desenha cada slide num canvas, toca o áudio e grava tudo com MediaRecorder.
+function wrapCanvasText(ctx, text, x, y, maxW, lineH) {
+  const words = String(text || "").split(/\s+/).filter(Boolean);
+  let line = "", yy = y;
+  for (const w of words) {
+    const test = line ? line + " " + w : w;
+    if (ctx.measureText(test).width > maxW && line) { ctx.fillText(line, x, yy); yy += lineH; line = w; }
+    else line = test;
+  }
+  if (line) { ctx.fillText(line, x, yy); yy += lineH; }
+  return yy;
+}
+function drawNarratedSlide(ctx, sl, idx, total) {
+  const W = 1280, H = 720;
+  ctx.fillStyle = "#2a0a33"; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#8e24aa"; ctx.fillRect(0, 0, W, 14);
+  ctx.fillStyle = "#ffffff"; ctx.font = "bold 56px sans-serif";
+  let y = wrapCanvasText(ctx, sl.title || "Seminário", 90, 140, W - 180, 68);
+  y += 30;
+  if (sl.type === "title" && sl.subtitle) {
+    ctx.fillStyle = "#e9d5ff"; ctx.font = "32px sans-serif";
+    wrapCanvasText(ctx, sl.subtitle, 90, y, W - 180, 44);
+  } else if (sl.type === "refs") {
+    ctx.fillStyle = "#e9d5ff"; ctx.font = "30px sans-serif";
+    wrapCanvasText(ctx, "As fontes consultadas estão listadas neste slide.", 90, y, W - 180, 42);
+  } else if (Array.isArray(sl.bullets)) {
+    ctx.fillStyle = "#f3e5f5"; ctx.font = "30px sans-serif";
+    for (const b of sl.bullets) {
+      y = wrapCanvasText(ctx, "• " + b, 90, y, W - 180, 42);
+      y += 14;
+      if (y > H - 90) break;
+    }
+  }
+  ctx.fillStyle = "#c4b5fd"; ctx.font = "24px sans-serif";
+  ctx.fillText((idx + 1) + " / " + total, W - 150, H - 40);
+}
+function narratedAudio(src, ctx, dest) {
+  const a = new Audio(src);
+  const node = ctx.createMediaElementSource(a);
+  node.connect(dest);
+  node.connect(ctx.destination);
+  const done = new Promise((resolve, reject) => {
+    a.onended = resolve;
+    a.onerror = () => reject(new Error("Falha ao tocar o áudio da narração."));
+  });
+  return { audio: a, done };
+}
+async function createNarratedVideo() {
+  const prog = $("#sem-video-prog"), btn = $("#sem-video");
+  const voice = $("#sem-video-voice").value;
+  prog.textContent = "Gerando narração...";
+  $("#sem-video-download").innerHTML = "";
+  $("#sem-video-preview").innerHTML = "";
+  btn.disabled = true;
+  try {
+    const slides = collectSlides();
+    const r = await api(`/api/seminars/${currentSeminar.id}/narrate`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ voice, slides }),
+    });
+    const parts = r.parts || [];
+    if (!parts.length) throw new Error("Nenhum áudio gerado.");
+    const canvas = document.createElement("canvas");
+    canvas.width = 1280; canvas.height = 720;
+    const ctx = canvas.getContext("2d");
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    await audioCtx.resume();
+    const dest = audioCtx.createMediaStreamDestination();
+    const canvasStream = canvas.captureStream(30);
+    const mixed = new MediaStream([...canvasStream.getVideoTracks(), ...dest.stream.getAudioTracks()]);
+    const mime = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", ""].find((m) => !m || MediaRecorder.isTypeSupported(m));
+    const rec = new MediaRecorder(mixed, mime ? { mimeType: mime } : undefined);
+    const chunks = [];
+    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise((resolve) => { rec.onstop = resolve; });
+    rec.start();
+    for (let p = 0; p < parts.length; p++) {
+      const part = parts[p];
+      prog.textContent = `Gravando vídeo... slide ${part.slide + 1} de ${slides.length} (${p + 1}/${parts.length})`;
+      drawNarratedSlide(ctx, slides[part.slide] || {}, part.slide, slides.length);
+      const { audio, done } = narratedAudio(part.audio, audioCtx, dest);
+      await audio.play();
+      await done;
+    }
+    await new Promise((r2) => setTimeout(r2, 1000));
+    rec.stop();
+    await stopped;
+    audioCtx.close();
+    const blob = new Blob(chunks, { type: "video/webm" });
+    const url = URL.createObjectURL(blob);
+    $("#sem-video-preview").innerHTML = `<video controls src="${url}" style="width:100%;max-width:720px"></video>`;
+    $("#sem-video-download").innerHTML = `<p><a href="${url}" download="seminario-${currentSeminar.id}-narrado.webm"><strong>Baixar vídeo narrado</strong></a></p>`;
+    prog.textContent = "Vídeo pronto!";
+  } catch (e) { prog.textContent = e.message; }
+  btn.disabled = false;
 }
 
 // ---------- 🩻 Análise de Raio-X ----------

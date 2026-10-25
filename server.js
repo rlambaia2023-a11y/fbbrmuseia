@@ -1,5 +1,6 @@
 import express from "express";
 import multer from "multer";
+import WebSocket from "ws";
 import crypto from "node:crypto";
 import path from "node:path";
 import fs from "node:fs";
@@ -516,6 +517,147 @@ app.post("/api/seminars/:id/export", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Falha ao exportar o seminário." });
+  }
+});
+
+// ---------- Vídeo narrado do seminário ----------
+// Gera o áudio da narração completa dos slides em pt-BR (voz masculina ou
+// feminina) e devolve os trechos em MP3 para o navegador montar o vídeo.
+// Voz gratuita (padrão): Edge TTS, sem conta e sem chave, vozes neurais pt-BR.
+// Se OPENAI_API_KEY estiver no ambiente do servidor, usa OpenAI TTS no lugar.
+const NARRATE_VOICES_OPENAI = { masculina: "onyx", feminina: "nova" };
+const NARRATE_VOICES_EDGE = { masculina: "pt-BR-AntonioNeural", feminina: "pt-BR-FranciscaNeural" };
+const EDGE_TOKEN = "6A5AA1D4EAFF4E9FB37E23D68491D6F4";
+const EDGE_VERSION = "1-143.0.3650.75";
+function narrationTextOfSlide(sl) {
+  if (!sl) return "";
+  if (sl.type === "title") return [sl.title, sl.subtitle].filter(Boolean).join(". ");
+  if (sl.type === "refs") return "Referências. As fontes consultadas estão listadas neste slide.";
+  const bullets = Array.isArray(sl.bullets) ? sl.bullets.filter(Boolean) : [];
+  return [sl.title, ...bullets].filter(Boolean).join(". ");
+}
+function splitNarration(text, max = 3800) {
+  const sentences = String(text).match(/[^.!?…]+[.!?…]+/g) || [String(text)];
+  const chunks = [];
+  let cur = "";
+  for (const s of sentences) {
+    const piece = s.trim();
+    if (!piece) continue;
+    if ((cur + " " + piece).trim().length > max && cur) { chunks.push(cur.trim()); cur = piece; }
+    else cur = (cur + " " + piece).trim();
+  }
+  if (cur) chunks.push(cur.trim());
+  return chunks.filter(Boolean);
+}
+async function ttsMp3(text, voice) {
+  const r = await fetch("https://api.openai.com/v1/audio/speech", {
+    method: "POST",
+    headers: {
+      Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: "tts-1", input: text, voice, response_format: "mp3" }),
+  });
+  if (!r.ok) {
+    let detail = "";
+    try { const j = await r.json(); detail = (j.error && j.error.message) || ""; } catch { /* ignora */ }
+    throw new Error("Falha na geração da voz (HTTP " + r.status + ")" + (detail ? ": " + detail : ""));
+  }
+  return Buffer.from(await r.arrayBuffer());
+}
+// Voz gratuita via Edge TTS (protocolo público do cliente Edge, sem chave).
+function edgeSecMsGec() {
+  let t = BigInt(Math.floor(Date.now() / 1000)) + 11644473600n;
+  t = t - (t % 300n);
+  t = t * 10000000n;
+  return crypto.createHash("sha256").update(t.toString() + EDGE_TOKEN, "ascii").digest("hex").toUpperCase();
+}
+function edgeTtsMp3(text, voice) {
+  return new Promise((resolve, reject) => {
+    const muid = crypto.randomBytes(16).toString("hex").toUpperCase();
+    const connId = crypto.randomUUID();
+    const reqId = crypto.randomUUID();
+    const url = `wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken=${EDGE_TOKEN}&Sec-MS-GEC=${edgeSecMsGec()}&Sec-MS-GEC-Version=${EDGE_VERSION}&ConnectionId=${connId}`;
+    const ts = () => new Date().toUTCString().replace("GMT", "GMT+0000 (Coordinated Universal Time)");
+    const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const chunks = [];
+    let ws;
+    const timer = setTimeout(() => { try { ws.close(); } catch { /* ignora */ } reject(new Error("Tempo esgotado na geração da voz gratuita.")); }, 60000);
+    ws = new WebSocket(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Language": "en-US,en;q=0.9",
+        Pragma: "no-cache",
+        "Cache-Control": "no-cache",
+        Origin: "chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold",
+        "Sec-WebSocket-Version": "13",
+        Cookie: `MUID=${muid}`,
+      },
+    });
+    ws.on("open", () => {
+      ws.send(`X-Timestamp:${ts()}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n${JSON.stringify({ context: { synthesis: { audio: { metadataoptions: { sentenceBoundaryEnabled: false, wordBoundaryEnabled: true }, outputFormat: "audio-24khz-48kbitrate-mono-mp3" } } } })}`);
+      const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="pt-BR"><voice name="${voice}">${esc(text)}</voice></speak>`;
+      ws.send(`X-RequestId:${reqId}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${ts()}\r\nPath:ssml\r\n\r\n${ssml}`);
+    });
+    ws.on("message", (data, isBinary) => {
+      if (!isBinary) {
+        const d = data.toString("utf8");
+        if (d.includes("Path:turn.end")) {
+          clearTimeout(timer);
+          if (!chunks.length) return reject(new Error("A voz gratuita não devolveu áudio."));
+          ws.close();
+          return resolve(Buffer.concat(chunks));
+        }
+        return;
+      }
+      const b = Buffer.from(data);
+      if (b.length >= 2) {
+        const hlen = b.readUInt16BE(0);
+        if (hlen > 0 && hlen < b.length) {
+          const header = b.subarray(2, 2 + hlen).toString("utf8");
+          if (header.includes("Path:audio")) { chunks.push(b.subarray(2 + hlen)); return; }
+        }
+      }
+      const sep = b.indexOf("\r\n\r\n");
+      if (sep !== -1) {
+        const header = b.subarray(0, sep).toString("utf8");
+        if (header.includes("Path:audio")) chunks.push(b.subarray(sep + 4));
+      }
+    });
+    ws.on("error", (e) => { clearTimeout(timer); reject(new Error("Falha na voz gratuita: " + (e.message || "conexão"))); });
+  });
+}
+app.post("/api/seminars/:id/narrate", async (req, res) => {
+  try {
+    const voiceKey = (req.body && req.body.voice) === "masculina" ? "masculina" : "feminina";
+    const useOpenAI = !!process.env.OPENAI_API_KEY;
+    const voice = useOpenAI ? NARRATE_VOICES_OPENAI[voiceKey] : NARRATE_VOICES_EDGE[voiceKey];
+    let slides = Array.isArray(req.body && req.body.slides) ? req.body.slides : null;
+    if (!slides) {
+      const s = buildSeminar(req.params.id);
+      if (!s) return res.status(404).json({ error: "Seminário não encontrado." });
+      slides = s.slides || [];
+    }
+    if (!slides.length) return res.status(400).json({ error: "O seminário não tem slides para narrar." });
+    const parts = [];
+    const stamp = Date.now();
+    let n = 0;
+    for (let i = 0; i < slides.length; i++) {
+      const text = narrationTextOfSlide(slides[i]);
+      if (!text.trim()) continue;
+      for (const chunk of splitNarration(text)) {
+        const mp3 = useOpenAI ? await ttsMp3(chunk, voice) : await edgeTtsMp3(chunk, voice);
+        const name = `narration-${req.params.id}-${stamp}-${n++}.mp3`;
+        fs.writeFileSync(path.join(UPLOAD_DIR, name), mp3);
+        parts.push({ slide: i, audio: `/uploads/${name}` });
+      }
+    }
+    if (!parts.length) return res.status(400).json({ error: "Nenhum texto para narrar nos slides." });
+    res.json({ voice: voiceKey, parts });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message || "Falha ao gerar a narração." });
   }
 });
 

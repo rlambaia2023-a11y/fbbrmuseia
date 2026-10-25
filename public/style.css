@@ -410,3 +410,21 @@ footer strong { color: var(--purple-dark); }
 
 /* Seminário: campos da capa sempre em maiúsculas */
 input.upper { text-transform: uppercase; }
+
+/* Prévias de estilo, fonte e fundo do seminário */
+.sem-preview { margin-top: 12px; border-radius: 16px; background-size: cover; background-position: center; padding: 22px; min-height: 170px; display: flex; align-items: center; justify-content: center; }
+.sem-preview-inner { background: rgba(255,255,255,.88); border-radius: 14px; padding: 16px 20px; text-align: center; max-width: 520px; }
+.sem-preview-title { font-weight: 800; font-size: 1.35rem; color: #2a0a33; margin-bottom: 6px; }
+.sem-preview-text { color: #2f3a40; font-size: .95rem; }
+.sem-opt-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.sem-opt { border: 2px solid var(--line, #e5e0eb); border-radius: 12px; padding: 6px 8px; cursor: pointer; background: #fff; text-align: center; color: inherit; }
+.sem-opt.sel { border-color: var(--purple, #8e24aa); box-shadow: 0 0 0 2px rgba(142,36,170,.18); }
+.sem-opt-thumb { width: 96px; height: 54px; border-radius: 8px; background-size: cover; background-position: center; }
+.sem-opt-label { font-size: .72rem; color: #555; margin-top: 4px; max-width: 96px; }
+.sem-opt-font { font-size: 1.05rem; padding: 6px 12px; }
+.sem-style-card { width: 112px; padding: 0 0 4px; overflow: hidden; }
+.sem-style-head { height: 34px; }
+.sem-style-bar { height: 5px; margin: 8px 10px 0; border-radius: 3px; }
+.sem-style-body { padding: 8px 10px 4px; text-align: left; }
+.sem-style-body b { font-size: .85rem; color: #2a0a33; }
+.sem-style-body div { height: 6px; background: #e5e0eb; border-radius: 3px; margin-top: 5px; }

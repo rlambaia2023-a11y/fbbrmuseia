@@ -434,7 +434,9 @@ app.get("/api/study-search", (req, res) => {
 // ---------- Seminários ----------
 const SEMINAR_STYLE_VALUES = ["moderno", "formal", "animado"];
 const SEMINAR_FONT_VALUES = ["padrao", "serifada", "georgia", "verdana", "courier", "comic"];
-const SEMINAR_BG_VALUES = ["padrao", "roxo", "azul", "verde", "vinho", "cinza", "claro"];
+const SEMINAR_BG_VALUES = ["padrao", "roxo", "azul", "verde", "vinho", "cinza", "claro",
+  "infantil-1", "infantil-2", "infantil-3", "infantil-4", "infantil-5",
+  "infantil-6", "infantil-7", "infantil-8", "infantil-9", "infantil-10"];
 // Dados da capa: o usuário digita em branco e tudo sai em maiúsculas
 const semUpper = (v) => String(v || "").trim().toUpperCase();
 const semMeta = (body) => ({

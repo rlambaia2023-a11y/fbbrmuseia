@@ -219,7 +219,9 @@ const THEMES = {
 function themeOf(seminar) {
   const base = THEMES[seminar && seminar.style] || THEMES.moderno;
   const bg = seminar && seminar.bg && SEMINAR_BACKGROUNDS[seminar.bg];
-  if (!bg || !bg.primary) return { ...base, coverText: "#ffffff" };
+  if (!bg) return { ...base, coverText: "#ffffff" };
+  if (bg.image) return { ...INFANTIL_THEME };
+  if (!bg.primary) return { ...base, coverText: "#ffffff" };
   return { ...base, primary: bg.primary, dark: bg.dark, accent: bg.accent, subtitle: bg.subtitle, coverText: bg.coverText };
 }
 
@@ -240,6 +242,8 @@ function fontOf(seminar) {
 
 // Fundos da apresentação: substituem as cores do estilo na capa e nos
 // detalhes (barras, títulos). "Padrão do estilo" mantém as cores do estilo.
+// Os fundos infantis usam as imagens geradas (public/fundos.json, data URI)
+// como fundo da capa e marca d'água nos demais slides.
 export const SEMINAR_BACKGROUNDS = {
   padrao: { label: "Padrão do estilo" },
   roxo:   { label: "Roxo", primary: "#6d28d9", dark: "#4c1d95", accent: "#f59e0b", subtitle: "#ede9fe", coverText: "#ffffff" },
@@ -248,7 +252,43 @@ export const SEMINAR_BACKGROUNDS = {
   vinho:  { label: "Vinho", primary: "#881337", dark: "#4c0519", accent: "#fbbf24", subtitle: "#ffe4e6", coverText: "#ffffff" },
   cinza:  { label: "Cinza escuro", primary: "#374151", dark: "#111827", accent: "#f59e0b", subtitle: "#e5e7eb", coverText: "#ffffff" },
   claro:  { label: "Claro (lilás)", primary: "#e9d5ff", dark: "#d8b4fe", accent: "#8e24aa", subtitle: "#581c87", coverText: "#2a0a33" },
+  "infantil-1":  { label: "Infantil 1: dentes felizes e escovas coloridas no lilás", image: "infantil-1" },
+  "infantil-2":  { label: "Infantil 2: céu com nuvens e arco-íris", image: "infantil-2" },
+  "infantil-3":  { label: "Infantil 3: bichinhos escovando dentes no verde menta", image: "infantil-3" },
+  "infantil-4":  { label: "Infantil 4: rosa com balões e lanchinhos saudáveis", image: "infantil-4" },
+  "infantil-5":  { label: "Infantil 5: amarelo com sol sorrindo e dentes de óculos de sol", image: "infantil-5" },
+  "infantil-6":  { label: "Infantil 6: fundo do mar com peixinhos e dente mergulhador", image: "infantil-6" },
+  "infantil-7":  { label: "Infantil 7: dinossauros fofos escovando os dentes no laranja", image: "infantil-7" },
+  "infantil-8":  { label: "Infantil 8: espaço roxo com dente astronauta", image: "infantil-8" },
+  "infantil-9":  { label: "Infantil 9: floresta encantada com bichinhos", image: "infantil-9" },
+  "infantil-10": { label: "Infantil 10: mundo dos doces com dente super-herói", image: "infantil-10" },
 };
+
+// Paleta legível usada com os fundos infantis (títulos em negrito escuro,
+// para o texto ficar visível sobre a ilustração)
+const INFANTIL_THEME = {
+  primary: "#4a148c", dark: "#2a0a33", accent: "#8e24aa",
+  gray: "#2f3a40", lightGray: "#5b6b72", faint: "#9fb3b8",
+  subtitle: "#6a1b9a", link: "#1565c0", coverText: "#2a0a33",
+};
+
+let _fundosCache = null;
+function bgImageDataUri(seminar) {
+  const key = seminar && seminar.bg;
+  if (!key || !String(key).startsWith("infantil-")) return null;
+  try {
+    if (!_fundosCache) {
+      const p = path.join(path.dirname(fileURLToPath(import.meta.url)), "public", "fundos.json");
+      _fundosCache = JSON.parse(fs.readFileSync(p, "utf8"));
+    }
+    return _fundosCache[key] || null;
+  } catch { return null; }
+}
+function bgImageBuffer(seminar) {
+  const uri = bgImageDataUri(seminar);
+  if (!uri) return null;
+  try { return Buffer.from(uri.split(",")[1], "base64"); } catch { return null; }
+}
 
 function roundImagePdf(doc, buf, x, y, w, h, r) {
   doc.save();
@@ -262,6 +302,7 @@ export async function exportSeminarPdf(seminar, destPath) {
   const T = themeOf(seminar);
   const F = fontOf(seminar);
   const coverText = T.coverText || "#ffffff";
+  const bgImg = bgImageBuffer(seminar);
   const W = 841.89, H = 595.28; // A4 paisagem em pontos
   const doc = new PDFDocument({ size: "A4", layout: "landscape", margin: 0 });
   const stream = fs.createWriteStream(destPath);
@@ -276,40 +317,73 @@ export async function exportSeminarPdf(seminar, destPath) {
     if (i > 0) doc.addPage();
     doc.font(F.pdf);
     if (s.type === "title") {
-      // Capa: degradê com círculos decorativos + dados da capa (maiúsculas)
-      const grad = doc.linearGradient(0, 0, W, H);
-      grad.stop(0, T.primary).stop(1, T.dark);
-      doc.rect(0, 0, W, H).fill(grad);
-      doc.opacity(0.07).fillColor("#ffffff");
-      doc.circle(W - 100, 110, 190).fill();
-      doc.circle(110, H - 90, 130).fill();
-      doc.circle(W - 320, H - 60, 70).fill();
-      doc.opacity(1);
-      if (seminar.institution) {
-        doc.font(F.pdfBold).fillColor(coverText).fontSize(16)
-          .text(seminar.institution, 60, 56, { width: W - 120, align: "center" });
+      if (bgImg) {
+        // Capa com fundo infantil: ilustração em tela cheia + cartão branco
+        // translúcido no centro, para o texto ficar legível e organizado
+        doc.image(bgImg, 0, 0, { cover: [W, H] });
+        doc.opacity(0.85).fillColor("#ffffff").roundedRect(60, 60, W - 120, H - 120, 24).fill();
+        doc.opacity(1);
+        if (seminar.institution) {
+          doc.font(F.pdfBold).fillColor(T.coverText).fontSize(16)
+            .text(seminar.institution, 60, 80, { width: W - 120, align: "center" });
+        }
+        doc.font(F.pdfBold).fillColor(T.coverText).fontSize(50)
+          .text(s.title || "", 60, H / 2 - 110, { width: W - 120, align: "center" });
+        doc.roundedRect(W / 2 - 40, H / 2 - 20, 80, 6, 3).fill(T.accent);
+        doc.font(F.pdf).fillColor(T.subtitle).fontSize(20)
+          .text(s.subtitle || "Seminário — Odontologia", 60, H / 2 + 10, { width: W - 120, align: "center" });
+        let yMeta = H / 2 + 70;
+        if (seminar.subject) {
+          doc.font(F.pdfBold).fillColor(T.coverText).fontSize(15)
+            .text(`MATÉRIA: ${seminar.subject}`, 60, yMeta, { width: W - 120, align: "center" });
+          yMeta += 28;
+        }
+        if (seminar.students) {
+          doc.font(F.pdf).fillColor(T.coverText).fontSize(13)
+            .text(seminar.students, 60, H - 140, { width: W - 120, align: "center" });
+        }
+        if (seminar.teacher) {
+          doc.font(F.pdf).fillColor(T.coverText).fontSize(13)
+            .text(`PROFESSOR(A): ${seminar.teacher}`, 60, H - 110, { width: W - 120, align: "center" });
+        }
+        doc.fillColor("#000000");
+      } else {
+        // Capa: degradê com círculos decorativos + dados da capa (maiúsculas)
+        const grad = doc.linearGradient(0, 0, W, H);
+        grad.stop(0, T.primary).stop(1, T.dark);
+        doc.rect(0, 0, W, H).fill(grad);
+        doc.opacity(0.07).fillColor("#ffffff");
+        doc.circle(W - 100, 110, 190).fill();
+        doc.circle(110, H - 90, 130).fill();
+        doc.circle(W - 320, H - 60, 70).fill();
+        doc.opacity(1);
+        if (seminar.institution) {
+          doc.font(F.pdfBold).fillColor(coverText).fontSize(16)
+            .text(seminar.institution, 60, 56, { width: W - 120, align: "center" });
+        }
+        doc.font(F.pdfBold).fillColor(coverText).fontSize(50)
+          .text(s.title || "", 60, H / 2 - 110, { width: W - 120, align: "center" });
+        doc.roundedRect(W / 2 - 40, H / 2 - 20, 80, 6, 3).fill(T.accent);
+        doc.font(F.pdf).fillColor(T.subtitle).fontSize(20)
+          .text(s.subtitle || "Seminário — Odontologia", 60, H / 2 + 10, { width: W - 120, align: "center" });
+        let yMeta = H / 2 + 70;
+        if (seminar.subject) {
+          doc.font(F.pdfBold).fillColor(coverText).fontSize(15)
+            .text(`MATÉRIA: ${seminar.subject}`, 60, yMeta, { width: W - 120, align: "center" });
+          yMeta += 28;
+        }
+        if (seminar.students) {
+          doc.font(F.pdf).fillColor(coverText).fontSize(13)
+            .text(seminar.students, 60, H - 92, { width: W - 120, align: "center" });
+        }
+        if (seminar.teacher) {
+          doc.font(F.pdf).fillColor(coverText).fontSize(13)
+            .text(`PROFESSOR(A): ${seminar.teacher}`, 60, H - 62, { width: W - 120, align: "center" });
+        }
+        doc.fillColor("#000000");
       }
-      doc.font(F.pdfBold).fillColor(coverText).fontSize(50)
-        .text(s.title || "", 60, H / 2 - 110, { width: W - 120, align: "center" });
-      doc.roundedRect(W / 2 - 40, H / 2 - 20, 80, 6, 3).fill(T.accent);
-      doc.font(F.pdf).fillColor(T.subtitle).fontSize(20)
-        .text(s.subtitle || "Seminário — Odontologia", 60, H / 2 + 10, { width: W - 120, align: "center" });
-      let yMeta = H / 2 + 70;
-      if (seminar.subject) {
-        doc.font(F.pdfBold).fillColor(coverText).fontSize(15)
-          .text(`MATÉRIA: ${seminar.subject}`, 60, yMeta, { width: W - 120, align: "center" });
-        yMeta += 28;
-      }
-      if (seminar.students) {
-        doc.font(F.pdf).fillColor(coverText).fontSize(13)
-          .text(seminar.students, 60, H - 92, { width: W - 120, align: "center" });
-      }
-      if (seminar.teacher) {
-        doc.font(F.pdf).fillColor(coverText).fontSize(13)
-          .text(`PROFESSOR(A): ${seminar.teacher}`, 60, H - 62, { width: W - 120, align: "center" });
-      }
-      doc.fillColor("#000000");
     } else if (s.type === "refs") {
+      if (bgImg) { doc.opacity(0.12); doc.image(bgImg, 0, 0, { cover: [W, H] }); doc.opacity(1); }
       doc.font(F.pdfBold).fillColor(T.primary).fontSize(30).text(s.title || "Referências", 60, 48, { width: W - 120 });
       doc.roundedRect(60, 96, 72, 6, 3).fill(T.accent);
       let y = 130;
@@ -323,7 +397,9 @@ export async function exportSeminarPdf(seminar, destPath) {
       doc.fillColor("#000000");
       footer(i + 1);
     } else {
-      // Título em cor do tema sobre fundo claro, sem faixa pesada
+      // Slide de conteúdo: fundo infantil vira marca d'água, para o texto
+      // (título em negrito) ficar legível e a leitura organizada
+      if (bgImg) { doc.opacity(0.12); doc.image(bgImg, 0, 0, { cover: [W, H] }); doc.opacity(1); }
       doc.font(F.pdfBold).fillColor(T.primary).fontSize(32).text(s.title || "", 60, 44, { width: W - 120 });
       doc.roundedRect(60, 96, 72, 6, 3).fill(T.accent);
       const hasImg = !!(s.image && s.image.url);
@@ -354,6 +430,7 @@ export async function exportSeminarPptx(seminar, destPath) {
   const T = themeOf(seminar);
   const F = fontOf(seminar);
   const coverText = (T.coverText || "#ffffff").slice(1);
+  const bgUri = bgImageDataUri(seminar);
   const pptx = new pptxgen();
   pptx.layout = "LAYOUT_WIDE";
   pptx.author = "Odontologia";
@@ -363,12 +440,23 @@ export async function exportSeminarPptx(seminar, destPath) {
   const accentBar = (slide, x, y, w) => {
     slide.addText("", { x, y, w, h: 0.09, fill: { color: T.accent.slice(1) } });
   };
+  // Fundo infantil em tela cheia + véu branco, para o texto ficar legível
+  const bgWatermark = (slide, transparency) => {
+    if (!bgUri) return;
+    slide.addImage({ data: bgUri, x: 0, y: 0, w: 13.33, h: 7.5 });
+    slide.addShape(pptx.shapes.RECTANGLE, { x: 0, y: 0, w: 13.33, h: 7.5, fill: { color: "FFFFFF", transparency }, line: { type: "none" } });
+  };
   for (let idx = 0; idx < slides.length; idx++) {
     const s = slides[idx];
     const n = idx + 1;
     const slide = pptx.addSlide();
     if (s.type === "title") {
-      slide.background = { color: T.primary.slice(1) };
+      if (bgUri) {
+        slide.addImage({ data: bgUri, x: 0, y: 0, w: 13.33, h: 7.5 });
+        slide.addShape(pptx.shapes.ROUNDED_RECTANGLE, { x: 0.7, y: 0.6, w: 11.93, h: 6.3, fill: { color: "FFFFFF", transparency: 15 }, line: { type: "none" } });
+      } else {
+        slide.background = { color: T.primary.slice(1) };
+      }
       if (seminar.institution) {
         slide.addText(seminar.institution, { x: 0.5, y: 0.4, w: 12.33, h: 0.6, fontSize: 16, bold: true, fontFace: F.pptx, align: "center", color: coverText });
       }
@@ -385,7 +473,8 @@ export async function exportSeminarPptx(seminar, destPath) {
         slide.addText(`PROFESSOR(A): ${seminar.teacher}`, { x: 0.5, y: 6.55, w: 12.33, h: 0.4, fontSize: 13, fontFace: F.pptx, align: "center", color: coverText });
       }
     } else if (s.type === "refs") {
-      slide.background = { color: "FFFFFF" };
+      if (bgUri) bgWatermark(slide, 25);
+      else slide.background = { color: "FFFFFF" };
       slide.addText(s.title || "Referências", { x: 0.6, y: 0.35, w: 12, h: 0.8, fontSize: 30, bold: true, fontFace: F.pptx, color: T.primary.slice(1) });
       accentBar(slide, 0.6, 1.18, 1.0);
       const items = (s.refs || []).map((r) => ({
@@ -395,7 +484,8 @@ export async function exportSeminarPptx(seminar, destPath) {
       if (items.length) slide.addText(items, { x: 0.6, y: 1.6, w: 12.1, h: 5, valign: "top", lineSpacingMultiple: 1.25, color: T.gray.slice(1) });
       footer(slide, n);
     } else {
-      slide.background = { color: "FFFFFF" };
+      if (bgUri) bgWatermark(slide, 25);
+      else slide.background = { color: "FFFFFF" };
       slide.addText(s.title || "", { x: 0.6, y: 0.35, w: 12, h: 0.8, fontSize: 30, bold: true, fontFace: F.pptx, color: T.primary.slice(1) });
       accentBar(slide, 0.6, 1.18, 1.0);
       let textW = 12.1;

@@ -1054,7 +1054,17 @@ async function loadSeminars() {
 }
 
 const SEM_FONT_OPTS = [["padrao", "Padrão (sem serifa)"], ["serifada", "Serifada (Times)"], ["georgia", "Georgia (serifada elegante)"], ["verdana", "Verdana (larga e legível)"], ["courier", "Monoespaçada (Courier)"], ["comic", "Divertida (Comic Sans)"]];
-const SEM_BG_OPTS = [["padrao", "Padrão do estilo"], ["roxo", "Roxo"], ["azul", "Azul escuro"], ["verde", "Verde"], ["vinho", "Vinho"], ["cinza", "Cinza escuro"], ["claro", "Claro (lilás)"]];
+const SEM_BG_OPTS = [["padrao", "Padrão do estilo"], ["roxo", "Roxo"], ["azul", "Azul escuro"], ["verde", "Verde"], ["vinho", "Vinho"], ["cinza", "Cinza escuro"], ["claro", "Claro (lilás)"],
+  ["infantil-1", "Infantil 1: dentes felizes e escovas coloridas no lilás"],
+  ["infantil-2", "Infantil 2: céu com nuvens e arco-íris"],
+  ["infantil-3", "Infantil 3: bichinhos escovando dentes no verde menta"],
+  ["infantil-4", "Infantil 4: rosa com balões e lanchinhos saudáveis"],
+  ["infantil-5", "Infantil 5: amarelo com sol sorrindo e dentes de óculos de sol"],
+  ["infantil-6", "Infantil 6: fundo do mar com peixinhos e dente mergulhador"],
+  ["infantil-7", "Infantil 7: dinossauros fofos escovando os dentes no laranja"],
+  ["infantil-8", "Infantil 8: espaço roxo com dente astronauta"],
+  ["infantil-9", "Infantil 9: floresta encantada com bichinhos"],
+  ["infantil-10", "Infantil 10: mundo dos doces com dente super-herói"]];
 // Dados da capa: o usuário preenche em branco; tudo sai em maiúsculas
 function semMetaPayload(prefix) {
   const up = (id) => { const el = $(id); return el ? el.value.toUpperCase() : ""; };
@@ -1170,6 +1180,7 @@ function renderSeminarEditor(s) {
             ${SEM_BG_OPTS.map(([v, l]) => `<option value="${v}"${(s.bg || "padrao") === v ? " selected" : ""}>${l}</option>`).join("")}
           </select></label>
         </div>
+        <div id="sem-ed-preview-wrap"></div>
       </div>
       <div id="sem-slides">${s.slides.map((sl, i) => slideEditorHtml(sl, i)).join("")}</div>
       <div class="row-actions">
@@ -1227,6 +1238,7 @@ function renderSeminarEditor(s) {
   const pdfBtn = $("#sem-pdf"), pptxBtn = $("#sem-pptx");
   if (pdfBtn) pdfBtn.addEventListener("click", () => exportSeminar("pdf"));
   if (pptxBtn) pptxBtn.addEventListener("click", () => exportSeminar("pptx"));
+  renderSemOptionPreviews("#sem-ed-");
 }
 
 async function exportSeminar(format) {
@@ -1699,3 +1711,101 @@ function anCalc() {
     if (document.body.classList.contains("menu-open")) btn.click();
   }));
 })();
+
+/* ---------- Prévias de estilo, fonte e fundo do seminário ----------
+   Cada opção ganha uma miniatura clicável; o painel mostra o slide com a
+   combinação escolhida (fundo + fonte + estilo), igual ao que sai no PDF/PPTX. */
+const SEM_FONT_CSS = { padrao: "Nunito, system-ui, sans-serif", serifada: "'Times New Roman', serif", georgia: "Georgia, serif", verdana: "Verdana, sans-serif", courier: "'Courier New', monospace", comic: "'Comic Sans MS', cursive" };
+const SEM_BG_COLOR = { roxo: "#6d28d9", azul: "#1e40af", verde: "#166534", vinho: "#881337", cinza: "#374151", claro: "#e9d5ff" };
+const SEM_STYLE_COLORS = {
+  moderno: { primary: "#0e7f8f", accent: "#f5a623", label: "Moderno e leve" },
+  formal: { primary: "#1a365d", accent: "#c9a227", label: "Formal e elegante" },
+  animado: { primary: "#6d28d9", accent: "#fb7185", label: "Animado e divertido" },
+};
+let semFundosCache = null;
+async function semFundos() {
+  if (!semFundosCache) {
+    try { semFundosCache = await (await fetch("/fundos.json")).json(); }
+    catch { semFundosCache = {}; }
+  }
+  return semFundosCache;
+}
+
+async function renderSemOptionPreviews(prefix) {
+  const wrap = $(prefix + "preview-wrap");
+  if (!wrap) return;
+  const fundos = await semFundos();
+  const bgThumb = ([v, l]) => {
+    if (v.startsWith("infantil-")) {
+      const uri = fundos[v] || "";
+      return `<button type="button" class="sem-opt" data-kind="bg" data-val="${v}" title="${esc(l)}"><div class="sem-opt-thumb" style="background-image:url('${uri}')"></div><div class="sem-opt-label">${esc(l.replace(/^Infantil \d+: /, ""))}</div></button>`;
+    }
+    const c = v === "padrao" ? "linear-gradient(135deg,#0e7f8f,#0a4f5c)" : (SEM_BG_COLOR[v] || "#ccc");
+    return `<button type="button" class="sem-opt" data-kind="bg" data-val="${v}" title="${esc(l)}"><div class="sem-opt-thumb" style="background:${c}"></div><div class="sem-opt-label">${esc(l)}</div></button>`;
+  };
+  wrap.innerHTML = `
+    <div class="sem-preview" data-pv>
+      <div class="sem-preview-inner">
+        <div class="sem-preview-title">Título do slide</div>
+        <div class="sem-preview-text">Exemplo de texto com a fonte e o fundo escolhidos. O título sai em negrito e o conteúdo fica legível sobre o fundo.</div>
+      </div>
+    </div>
+    <p class="meta" style="margin-top:12px">Prévia do estilo — toque para escolher:</p>
+    <div class="sem-opt-row">
+      ${Object.entries(SEM_STYLE_COLORS).map(([v, s]) => `
+        <button type="button" class="sem-opt sem-style-card" data-kind="style" data-val="${v}" title="${s.label}">
+          <div class="sem-style-head" style="background:${s.primary}"></div>
+          <div class="sem-style-bar" style="background:${s.accent}"></div>
+          <div class="sem-style-body"><b>Título</b><div></div><div style="width:70%"></div></div>
+          <div class="sem-opt-label">${s.label}</div>
+        </button>`).join("")}
+    </div>
+    <p class="meta" style="margin-top:12px">Prévia da fonte — toque para escolher:</p>
+    <div class="sem-opt-row">
+      ${SEM_FONT_OPTS.map(([v, l]) => `
+        <button type="button" class="sem-opt sem-opt-font" data-kind="font" data-val="${v}" style="font-family:${SEM_FONT_CSS[v]}" title="${l}">Texto de exemplo<div class="sem-opt-label">${l}</div></button>`).join("")}
+    </div>
+    <p class="meta" style="margin-top:12px">Prévia do fundo — toque para escolher:</p>
+    <div class="sem-opt-row">${SEM_BG_OPTS.map(bgThumb).join("")}</div>`;
+  const sync = () => updateSemPreview(prefix);
+  wrap.querySelectorAll("[data-kind]").forEach(btn => btn.addEventListener("click", () => {
+    const sel = $(prefix + (btn.dataset.kind === "style" ? "style" : btn.dataset.kind === "font" ? "font" : "bg"));
+    if (sel) sel.value = btn.dataset.val;
+    sync();
+  }));
+  ["style", "font", "bg"].forEach(k => {
+    const sel = $(prefix + k);
+    if (sel) sel.addEventListener("change", sync);
+  });
+  sync();
+}
+
+async function updateSemPreview(prefix) {
+  const wrap = $(prefix + "preview-wrap");
+  if (!wrap) return;
+  const pv = wrap.querySelector("[data-pv]");
+  if (!pv) return;
+  const style = $(prefix + "style") ? $(prefix + "style").value : "moderno";
+  const font = $(prefix + "font") ? $(prefix + "font").value : "padrao";
+  const bg = $(prefix + "bg") ? $(prefix + "bg").value : "padrao";
+  const inner = pv.querySelector(".sem-preview-inner");
+  inner.style.fontFamily = SEM_FONT_CSS[font] || SEM_FONT_CSS.padrao;
+  if (bg && bg.startsWith("infantil-")) {
+    const fundos = await semFundos();
+    pv.style.backgroundImage = fundos[bg] ? `url("${fundos[bg]}")` : "";
+    pv.style.backgroundColor = "";
+  } else if (bg && SEM_BG_COLOR[bg]) {
+    pv.style.backgroundImage = "";
+    pv.style.backgroundColor = SEM_BG_COLOR[bg];
+  } else {
+    pv.style.backgroundImage = "";
+    pv.style.backgroundColor = (SEM_STYLE_COLORS[style] || SEM_STYLE_COLORS.moderno).primary;
+  }
+  wrap.querySelectorAll("[data-kind]").forEach(btn => {
+    const cur = btn.dataset.kind === "style" ? style : btn.dataset.kind === "font" ? font : bg;
+    btn.classList.toggle("sel", btn.dataset.val === cur);
+  });
+}
+
+// Prévias do formulário de geração do seminário
+renderSemOptionPreviews("#sem-");

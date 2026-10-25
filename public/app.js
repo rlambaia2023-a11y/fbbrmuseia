@@ -1078,18 +1078,23 @@ function semMetaPayload(prefix) {
   };
 }
 
+$("#sem-infantil").addEventListener("change", (e) => {
+  if (e.target.checked) $("#sem-style").value = "animado";
+});
+
 $("#sem-generate").addEventListener("click", async () => {
   const theme = $("#sem-theme").value.trim();
   if (theme.length < 3) { alert("Digite o tema do seminário."); return; }
   const btn = $("#sem-generate"), prog = $("#sem-prog");
   btn.disabled = true;
-  prog.textContent = "Pesquisando o tema, buscando imagens e montando os slides... pode levar cerca de 1 minuto.";
+  prog.textContent = "Pesquisando o tema, buscando imagens e montando os slides... pode levar de 1 a 2 minutos.";
   try {
     const slideCount = Math.min(14, Math.max(4, parseInt($("#sem-pages").value, 10) || 7));
     const style = $("#sem-style").value || "moderno";
+    const infantil = !!($("#sem-infantil") && $("#sem-infantil").checked);
     const s = await api("/api/seminars/generate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ theme, slideCount, style, ...semMetaPayload("#sem-") }),
+      body: JSON.stringify({ theme, slideCount, style, infantil, ...semMetaPayload("#sem-") }),
     });
     prog.textContent = "";
     $("#sem-theme").value = "";

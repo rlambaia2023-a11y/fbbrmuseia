@@ -455,7 +455,7 @@ app.post("/api/seminars/generate", async (req, res) => {
     let slideCount = parseInt(req.body && req.body.slideCount, 10);
     if (!Number.isFinite(slideCount)) slideCount = 7;
     slideCount = Math.min(14, Math.max(4, slideCount));
-    const slides = await generateSeminar(theme, { slideCount, style });
+    const slides = await generateSeminar(theme, { slideCount, style, infantil: req.body && (req.body.infantil === true || req.body.infantil === "true") });
     const m = semMeta(req.body);
     const r = run("INSERT INTO seminars (theme, slides, status, style, institution, students, subject, teacher, font, bg) VALUES (?, ?, 'rascunho', ?, ?, ?, ?, ?, ?, ?)",
       theme, JSON.stringify(slides), style, m.institution, m.students, m.subject, m.teacher, m.font, m.bg);

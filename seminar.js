@@ -28,10 +28,15 @@ const PT_EN = {
   carie: ["caries", "cavity", "decay"], pulpite: ["pulpitis"], periodontite: ["periodontitis"],
   gengivite: ["gingivitis"], gengiva: ["gum", "gingiva"], canal: ["root canal"],
   extracao: ["extraction"], extracoes: ["extraction"], implante: ["implant"], implantes: ["implant"],
+  implantodontia: ["implant", "dental implant"],
   protese: ["denture", "prosthesis"], proteses: ["denture", "prosthesis"],
   aparelho: ["braces"], radiografia: ["radiograph", "x-ray"], radiografias: ["radiograph", "x-ray"],
+  radiologia: ["radiology", "radiograph"],
   cirurgia: ["surgery"], restauracao: ["restoration", "filling"], restauracoes: ["restoration", "filling"],
+  dentistica: ["restorative dentistry", "restoration"],
   endodontia: ["endodontics"], periodontia: ["periodontics"], ortodontia: ["orthodontics"],
+  estomatologia: ["oral medicine", "stomatology"], semiologia: ["diagnosis", "oral diagnosis"],
+  anatomia: ["anatomy"], anatomia_dental: ["dental anatomy"],
   clareamento: ["whitening", "bleaching"], fluor: ["fluoride"], placa: ["plaque"],
   tartaro: ["tartar", "calculus"], oclusao: ["occlusion"], atm: ["tmj"],
   bruxismo: ["bruxism"], biopsia: ["biopsy"], sutura: ["suture"], anestesico: ["anesthetic"],
@@ -100,6 +105,12 @@ export async function commonsImages(query, limit = 4) {
 }
 
 async function fetchImage(url) {
+  // Ilustração gerada empacotada (data URI do catálogo infantil)
+  if (url.startsWith("data:image/")) {
+    const m = url.match(/^data:(image\/(?:jpeg|png));base64,(.+)$/);
+    if (!m) throw new Error("ilustração inválida");
+    return { buf: Buffer.from(m[2], "base64"), mime: m[1] };
+  }
   // Imagem local (ex.: /uploads/gerada-pela-ia.jpg): le do disco
   if (url.startsWith("/uploads/")) {
     const abs = path.join(UPLOADS_DIR, path.basename(url));
@@ -119,7 +130,7 @@ async function fetchImage(url) {
   return { buf, mime };
 }
 
-function toBullets(text, max = 4) {
+function toBullets(text, max = 5) {
   const parts = (text.match(/[^.!?…]+[.!?…]/g) || [text])
     .map((s) => s.trim())
     .filter((s) => s.length > 20)
@@ -138,11 +149,80 @@ export const SEMINAR_STYLE_LABELS = {
 const MIDDLE_SECTIONS = [
   { title: "Principais aspectos", q: (c) => `${c} características principais`, boost: ["característica", "principal", "aspecto", "tipo", "classificação"] },
   { title: "Tipos e classificação", q: (c) => `${c} tipos classificação`, boost: ["tipo", "classificação", "classifica", "categoria", "divide"] },
+  { title: "Técnicas e procedimentos", q: (c) => `${c} técnicas procedimentos`, boost: ["técnica", "procedimento", "passo", "etapa", "protocolo"] },
+  { title: "Diagnóstico e avaliação", q: (c) => `${c} diagnóstico avaliação`, boost: ["diagnóstico", "avaliação", "sintoma", "sinal", "exame"] },
   { title: "Na prática clínica", q: (c) => `${c} tratamento aplicação clínica`, boost: ["clínica", "tratamento", "técnica", "procedimento", "indicação"] },
   { title: "Pontos de atenção", q: (c) => `${c} cuidados`, boost: ["cuidado", "atenção", "complicação", "risco", "contraindicação"] },
   { title: "Cuidados e manutenção", q: (c) => `${c} manutenção higiene cuidados`, boost: ["manutenção", "higiene", "cuidado", "durabilidade", "limpeza"] },
+  { title: "Prevenção e orientação", q: (c) => `${c} prevenção orientação paciente`, boost: ["prevenção", "orientação", "educação", "hábito", "evitar"] },
+  { title: "Erros comuns e como evitá-los", q: (c) => `${c} erros comuns evitar`, boost: ["erro", "comum", "evitar", "falha", "cuidado"] },
   { title: "Avanços e atualidades", q: (c) => `${c} avanços novidades tecnologia`, boost: ["avanço", "novo", "tecnologia", "atual", "inovação"] },
 ];
+
+// Temas infantis: o seminário usa ilustrações geradas (sem foto clínica).
+// A detecção é pelo tema ou pela opção marcada no formulário.
+const INFANTIL_WORDS = ["infantil", "crianca", "criancas", "pediatria", "pediatrico", "pediatrica", "odontopediatria", "bebe", "bebes", "primeira infancia", "dente de leite", "infancia", "kids"];
+const normKey = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function isInfantilTheme(clean, opts) {
+  if (opts && opts.infantil) return true;
+  const n = normKey(clean);
+  return INFANTIL_WORDS.some((w) => n.includes(w));
+}
+let _ilustraCache = null;
+function ilustracoesInfantis() {
+  try {
+    if (!_ilustraCache) {
+      const p = path.join(path.dirname(fileURLToPath(import.meta.url)), "public", "ilustracoes-infantis.json");
+      _ilustraCache = JSON.parse(fs.readFileSync(p, "utf8"));
+    }
+    return _ilustraCache;
+  } catch { return {}; }
+}
+// Escolhe a ilustração com mais afinidade com o slide (título + bullets);
+// cada ilustração é usada no máximo uma vez por seminário.
+function pickIlustracao(slide, usedKeys) {
+  const cat = ilustracoesInfantis();
+  const keys = Object.keys(cat).filter((k) => !usedKeys.has(k));
+  if (!keys.length) return null;
+  const hay = normKey(slide.title + " " + (slide.bullets || []).join(" "));
+  let best = keys[0], bestScore = -1;
+  for (const k of keys) {
+    const sc = (cat[k].tags || []).filter((t) => hay.includes(normKey(t))).length;
+    if (sc > bestScore) { bestScore = sc; best = k; }
+  }
+  usedKeys.add(best);
+  return { url: cat[best].data, page: "", title: cat[best].label };
+}
+// Rede de segurança: frases do material pesquisado com maior sobreposição
+// de palavras-chave com a pergunta da seção (sem inventar conteúdo).
+function bestOverlapSentences(pool, queryTokens, count, exclude) {
+  const wordSet = (s) => new Set(keywords(s));
+  const scored = [];
+  for (const p of pool) {
+    for (const s of (String(p).match(/[^.!?…]+[.!?…]/g) || [])) {
+      const t = s.trim();
+      if (t.length < 25) continue;
+      const key = t.slice(0, 50).toLowerCase();
+      if (exclude.has(key)) continue;
+      const toks = wordSet(t);
+      const hits = queryTokens.filter((q) => toks.has(q)).length;
+      if (hits >= 1) scored.push({ s: t, hits, toks });
+    }
+  }
+  scored.sort((a, b) => b.hits - a.hits);
+  const out = [];
+  for (const c of scored) {
+    if (out.length >= count) break;
+    const dup = out.some((o) => {
+      const ow = wordSet(o);
+      let inter = 0;
+      for (const w of c.toks) if (ow.has(w)) inter++;
+      return inter / Math.max(1, c.toks.size) > 0.6;
+    });
+    if (!dup) out.push(c.s);
+  }
+  return out;
+}
 
 export async function generateSeminar(theme, opts = {}) {
   const clean = String(theme || "").trim();
@@ -150,6 +230,7 @@ export async function generateSeminar(theme, opts = {}) {
   const style = SEMINAR_STYLES.includes(opts.style) ? opts.style : "moderno";
   const total = Math.min(14, Math.max(4, parseInt(opts.slideCount, 10) || 7));
   const contentCount = total - 2; // sem capa e sem referências
+  const infantil = isInfantilTheme(clean, opts);
 
   const results = await searchWeb(`${clean} odontologia`, 8);
   if (!results.length) throw new Error("Não foi possível pesquisar o tema na internet agora.");
@@ -168,27 +249,85 @@ export async function generateSeminar(theme, opts = {}) {
 
   const slides = [{ type: "title", title: clean, subtitle: "Seminário — Odontologia", style }];
   const usedSentences = new Set(); // cada slide usa frases diferentes
-  const addSection = (title, q, boost) => {
-    const text = humanizeAnswer(q, passages, snippets, { boost, exclude: [...usedSentences] });
+  const markUsed = (text) => {
     (text.match(/[^.!?…]+[.!?…]/g) || []).forEach((s) => usedSentences.add(s.slice(0, 50).toLowerCase()));
-    slides.push({
-      type: "content",
-      title,
-      bullets: toBullets(text || "Conteúdo em elaboração a partir das fontes pesquisadas."),
-      style,
-    });
   };
-  addSection("Introdução", `o que é ${clean}`, ["é", "define", "conceito", "consiste"]);
+  const sections = [];
+  // Monta uma seção; se ficar vazia ou rala com o material comum, faz uma
+  // pesquisa dedicada ao tema da seção e, em último caso, completa com as
+  // frases mais afins do material pesquisado. Nenhuma seção sai vazia.
+  const buildSection = async (title, q, boost) => {
+    let text = humanizeAnswer(q, passages, snippets, { boost, exclude: [...usedSentences] });
+    let bullets = text ? toBullets(text) : [];
+    if (text) markUsed(text);
+    if (bullets.length < 3) {
+      try {
+        const r2 = await searchWeb(q, 5);
+        const toks2 = [...new Set(keywords(q))].slice(0, 24);
+        const p2 = [];
+        for (const r of r2.slice(0, 2)) {
+          const ev = await pageEvidence(r.url, toks2);
+          if (ev) p2.push(ev);
+          await sleep(400);
+        }
+        const s2 = r2.map((r) => `${r.title}. ${r.snippet}`).filter(Boolean);
+        const text2 = humanizeAnswer(q, [...p2, ...passages], [...s2, ...snippets], { boost, exclude: [...usedSentences] });
+        if (text2) {
+          bullets = toBullets(text2);
+          markUsed(text2);
+          passages.push(...p2);
+          snippets.push(...s2);
+        }
+      } catch { /* segue para a rede de segurança */ }
+    }
+    if (bullets.length < 3) {
+      const extra = bestOverlapSentences([...passages, ...snippets], keywords(q), 3 - bullets.length, usedSentences);
+      bullets.push(...extra);
+    }
+    if (!bullets.length) bullets = ["Conteúdo em elaboração a partir das fontes pesquisadas."];
+    const slide = { type: "content", title, bullets, style };
+    slides.push(slide);
+    sections.push({ slide, query: q });
+    return slide;
+  };
+  await buildSection("Introdução", `o que é ${clean}`, ["é", "define", "conceito", "consiste"]);
   for (const m of MIDDLE_SECTIONS.slice(0, Math.max(0, contentCount - 2))) {
-    addSection(m.title, m.q(clean), m.boost);
+    await buildSection(m.title, m.q(clean), m.boost);
   }
-  addSection("Conclusão", `${clean} importância`, ["importância", "conclusão", "portanto", "fundamental"]);
-  const images = await commonsImages(clean, Math.min(5, contentCount));
-  const nContent = slides.length - 1;
-  images.forEach((img, i) => {
-    const si = 1 + (i % nContent);
-    if (!slides[si].image) slides[si].image = img;
-  });
+  // Conclusão por síntese: recapitula o que o próprio seminário ensinou
+  // (introdução + prática + pontos de atenção), soma a importância
+  // pesquisada e fecha. Nunca sai genérica ou vazia.
+  const byTitle = (t) => sections.find((s) => s.slide.title === t)?.slide;
+  const lowerFirst = (s) => (s ? s.charAt(0).toLowerCase() + s.slice(1) : "");
+  const conclBullets = [];
+  const intro = byTitle("Introdução");
+  if (intro?.bullets[0]) conclBullets.push(`Ao longo do seminário, vimos que ${lowerFirst(intro.bullets[0])}`);
+  const clin = byTitle("Na prática clínica") || byTitle("Técnicas e procedimentos");
+  if (clin?.bullets[0]) conclBullets.push(`Na prática, ${lowerFirst(clin.bullets[0])}`);
+  const aten = byTitle("Pontos de atenção");
+  if (aten?.bullets[0]) conclBullets.push(aten.bullets[0]);
+  const conclText = humanizeAnswer(`${clean} importância`, passages, snippets, { boost: ["importância", "conclusão", "portanto", "fundamental"], exclude: [...usedSentences] });
+  if (conclText) conclBullets.push(...toBullets(conclText).slice(0, 2));
+  conclBullets.push(infantil
+    ? "Cuidar dos dentinhos desde cedo garante sorrisos saudáveis para a vida toda."
+    : `Por isso, ${clean} é um tema fundamental na odontologia, unindo conhecimento teórico e cuidado com o paciente.`);
+  slides.push({ type: "content", title: "Conclusão", bullets: conclBullets.slice(0, 5), style });
+  // Imagens: tema infantil usa as ilustrações geradas; os demais usam o Commons.
+  const contentSlides = slides.filter((s) => s.type === "content");
+  if (infantil) {
+    const usedKeys = new Set();
+    for (const sl of contentSlides) {
+      const img = pickIlustracao(sl, usedKeys);
+      if (img) sl.image = img;
+    }
+  } else {
+    const images = await commonsImages(clean, Math.min(5, contentCount));
+    const nContent = slides.length - 1;
+    images.forEach((img, i) => {
+      const si = 1 + (i % nContent);
+      if (!slides[si].image) slides[si].image = img;
+    });
+  }
   slides.push({
     type: "refs",
     title: "Referências",

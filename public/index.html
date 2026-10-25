@@ -184,6 +184,10 @@
     <p class="meta">Digite o tema: o sistema pesquisa, monta os slides com imagens, dados e explicações. Você revisa, ajusta e, depois de aprovar, exporta em PDF ou PowerPoint.</p>
     <div class="card form">
       <label>Tema do seminário <input id="sem-theme" placeholder="Ex.: Prótese parcial fixa" maxlength="120"></label>
+      <label>Nome da instituição <input id="sem-institution" class="upper" placeholder="Ex.: FACULDADE FBBR" maxlength="120"></label>
+      <label>Nome dos alunos <input id="sem-students" class="upper" placeholder="Ex.: MARIA SILVA, JOÃO SOUZA" maxlength="300"></label>
+      <label>Nome da matéria <input id="sem-subject" class="upper" placeholder="Ex.: PRÓTESE PARCIAL E FIXA" maxlength="120"></label>
+      <label>Nome do professor(a) <input id="sem-teacher" class="upper" placeholder="Ex.: JOÃO BARBOSAH" maxlength="120"></label>
       <div class="sem-opts">
         <label>Páginas <input id="sem-pages" type="number" min="4" max="14" value="7"></label>
         <label>Estilo <select id="sem-style">
@@ -191,7 +195,25 @@
           <option value="formal">Formal e elegante</option>
           <option value="animado">Animado e divertido</option>
         </select></label>
+        <label>Fonte <select id="sem-font">
+          <option value="padrao">Padrão (sem serifa)</option>
+          <option value="serifada">Serifada (Times)</option>
+          <option value="georgia">Georgia (serifada elegante)</option>
+          <option value="verdana">Verdana (larga e legível)</option>
+          <option value="courier">Monoespaçada (Courier)</option>
+          <option value="comic">Divertida (Comic Sans)</option>
+        </select></label>
+        <label>Fundo <select id="sem-bg">
+          <option value="padrao">Padrão do estilo</option>
+          <option value="roxo">Roxo</option>
+          <option value="azul">Azul escuro</option>
+          <option value="verde">Verde</option>
+          <option value="vinho">Vinho</option>
+          <option value="cinza">Cinza escuro</option>
+          <option value="claro">Claro (lilás)</option>
+        </select></label>
       </div>
+      <p class="meta">Os 4 campos acima saem em maiúsculas na capa. No PDF, fontes especiais usam a mais próxima disponível; no PowerPoint vale o nome exato da fonte.</p>
       <div class="row-actions"><button type="button" id="sem-generate" class="primary">Gerar seminário</button></div>
       <div class="ocr-status" id="sem-prog"></div>
     </div>

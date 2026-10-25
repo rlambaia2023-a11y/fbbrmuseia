@@ -433,6 +433,18 @@ app.get("/api/study-search", (req, res) => {
 
 // ---------- Seminários ----------
 const SEMINAR_STYLE_VALUES = ["moderno", "formal", "animado"];
+const SEMINAR_FONT_VALUES = ["padrao", "serifada", "georgia", "verdana", "courier", "comic"];
+const SEMINAR_BG_VALUES = ["padrao", "roxo", "azul", "verde", "vinho", "cinza", "claro"];
+// Dados da capa: o usuário digita em branco e tudo sai em maiúsculas
+const semUpper = (v) => String(v || "").trim().toUpperCase();
+const semMeta = (body) => ({
+  institution: semUpper(body && body.institution),
+  students: semUpper(body && body.students),
+  subject: semUpper(body && body.subject),
+  teacher: semUpper(body && body.teacher),
+  font: SEMINAR_FONT_VALUES.includes(body && body.font) ? body.font : "padrao",
+  bg: SEMINAR_BG_VALUES.includes(body && body.bg) ? body.bg : "padrao",
+});
 app.post("/api/seminars/generate", async (req, res) => {
   try {
     const theme = String((req.body && req.body.theme) || "").trim();
@@ -442,7 +454,9 @@ app.post("/api/seminars/generate", async (req, res) => {
     if (!Number.isFinite(slideCount)) slideCount = 7;
     slideCount = Math.min(14, Math.max(4, slideCount));
     const slides = await generateSeminar(theme, { slideCount, style });
-    const r = run("INSERT INTO seminars (theme, slides, status, style) VALUES (?, ?, 'rascunho', ?)", theme, JSON.stringify(slides), style);
+    const m = semMeta(req.body);
+    const r = run("INSERT INTO seminars (theme, slides, status, style, institution, students, subject, teacher, font, bg) VALUES (?, ?, 'rascunho', ?, ?, ?, ?, ?, ?, ?)",
+      theme, JSON.stringify(slides), style, m.institution, m.students, m.subject, m.teacher, m.font, m.bg);
     res.status(201).json(buildSeminar(r.lastInsertRowid));
   } catch (err) {
     console.error(err);
@@ -466,12 +480,20 @@ app.put("/api/seminars/:id", (req, res) => {
   const { theme, slides, status } = req.body || {};
   if (slides && !Array.isArray(slides)) return res.status(400).json({ error: "Slides inválidos." });
   if (status && !["rascunho", "aprovado"].includes(status)) return res.status(400).json({ error: "Status inválido." });
+  const m = semMeta(req.body);
+  const b = req.body || {};
   run(
-    "UPDATE seminars SET theme = COALESCE(?, theme), slides = COALESCE(?, slides), status = COALESCE(?, status), style = COALESCE(?, style) WHERE id = ?",
+    "UPDATE seminars SET theme = COALESCE(?, theme), slides = COALESCE(?, slides), status = COALESCE(?, status), style = COALESCE(?, style), institution = COALESCE(?, institution), students = COALESCE(?, students), subject = COALESCE(?, subject), teacher = COALESCE(?, teacher), font = COALESCE(?, font), bg = COALESCE(?, bg) WHERE id = ?",
     theme ? String(theme).trim() : null,
     slides ? JSON.stringify(slides) : null,
     status || null,
     req.body.style || null,
+    b.institution !== undefined ? m.institution : null,
+    b.students !== undefined ? m.students : null,
+    b.subject !== undefined ? m.subject : null,
+    b.teacher !== undefined ? m.teacher : null,
+    b.font !== undefined ? m.font : null,
+    b.bg !== undefined ? m.bg : null,
     s.id
   );
   res.json(buildSeminar(s.id));

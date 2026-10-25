@@ -131,6 +131,22 @@ db.exec(`
   if (!_semCols.includes("style")) db.exec("ALTER TABLE seminars ADD COLUMN style TEXT DEFAULT 'moderno'");
 }
 
+// Migração: dados da capa do seminário (tudo em maiúsculas) + fonte e fundo
+for (const col of [
+  "institution TEXT DEFAULT ''",
+  "students TEXT DEFAULT ''",
+  "subject TEXT DEFAULT ''",
+  "teacher TEXT DEFAULT ''",
+  "font TEXT DEFAULT 'padrao'",
+  "bg TEXT DEFAULT 'padrao'",
+]) {
+  try {
+    db.exec(`ALTER TABLE seminars ADD COLUMN ${col}`);
+  } catch {
+    /* coluna já existe */
+  }
+}
+
 
 // Migração idempotente: colunas do padrão de resolução (justificativa + versão curta)
 for (const col of ["suggested_short TEXT DEFAULT ''", "justification TEXT DEFAULT ''"]) {

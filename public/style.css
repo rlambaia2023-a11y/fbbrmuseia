@@ -407,3 +407,6 @@ footer strong { color: var(--purple-dark); }
   body.menu-open .sidebar nav .tab .lbl { display: inline; }
   body.menu-open .sidebar nav .tab .ico { width: 36px; height: 36px; }
 }
+
+/* Seminário: campos da capa sempre em maiúsculas */
+input.upper { text-transform: uppercase; }

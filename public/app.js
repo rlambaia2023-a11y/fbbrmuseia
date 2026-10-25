@@ -1053,6 +1053,21 @@ async function loadSeminars() {
   if (!currentSeminar) $("#sem-editor").innerHTML = "";
 }
 
+const SEM_FONT_OPTS = [["padrao", "Padrão (sem serifa)"], ["serifada", "Serifada (Times)"], ["georgia", "Georgia (serifada elegante)"], ["verdana", "Verdana (larga e legível)"], ["courier", "Monoespaçada (Courier)"], ["comic", "Divertida (Comic Sans)"]];
+const SEM_BG_OPTS = [["padrao", "Padrão do estilo"], ["roxo", "Roxo"], ["azul", "Azul escuro"], ["verde", "Verde"], ["vinho", "Vinho"], ["cinza", "Cinza escuro"], ["claro", "Claro (lilás)"]];
+// Dados da capa: o usuário preenche em branco; tudo sai em maiúsculas
+function semMetaPayload(prefix) {
+  const up = (id) => { const el = $(id); return el ? el.value.toUpperCase() : ""; };
+  return {
+    institution: up(prefix + "institution"),
+    students: up(prefix + "students"),
+    subject: up(prefix + "subject"),
+    teacher: up(prefix + "teacher"),
+    font: $(prefix + "font") ? $(prefix + "font").value : "padrao",
+    bg: $(prefix + "bg") ? $(prefix + "bg").value : "padrao",
+  };
+}
+
 $("#sem-generate").addEventListener("click", async () => {
   const theme = $("#sem-theme").value.trim();
   if (theme.length < 3) { alert("Digite o tema do seminário."); return; }
@@ -1063,7 +1078,8 @@ $("#sem-generate").addEventListener("click", async () => {
     const slideCount = Math.min(14, Math.max(4, parseInt($("#sem-pages").value, 10) || 7));
     const style = $("#sem-style").value || "moderno";
     const s = await api("/api/seminars/generate", {
-      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme, slideCount, style }),
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ theme, slideCount, style, ...semMetaPayload("#sem-") }),
     });
     prog.textContent = "";
     $("#sem-theme").value = "";
@@ -1140,6 +1156,21 @@ function renderSeminarEditor(s) {
         &nbsp;·&nbsp; Estilo: <select id="sem-ed-style">
           ${["moderno", "formal", "animado"].map((v) => `<option value="${v}"${(s.style || "moderno") === v ? " selected" : ""}>${v === "moderno" ? "Moderno e leve" : v === "formal" ? "Formal e elegante" : "Animado e divertido"}</option>`).join("")}
         </select></p>
+      <div class="card form" style="margin-top:10px">
+        <h4>Dados da capa (em maiúsculas)</h4>
+        <label>Nome da instituição <input id="sem-ed-institution" class="upper" value="${esc(s.institution || "")}" maxlength="120"></label>
+        <label>Nome dos alunos <input id="sem-ed-students" class="upper" value="${esc(s.students || "")}" maxlength="300"></label>
+        <label>Nome da matéria <input id="sem-ed-subject" class="upper" value="${esc(s.subject || "")}" maxlength="120"></label>
+        <label>Nome do professor(a) <input id="sem-ed-teacher" class="upper" value="${esc(s.teacher || "")}" maxlength="120"></label>
+        <div class="sem-opts">
+          <label>Fonte <select id="sem-ed-font">
+            ${SEM_FONT_OPTS.map(([v, l]) => `<option value="${v}"${(s.font || "padrao") === v ? " selected" : ""}>${l}</option>`).join("")}
+          </select></label>
+          <label>Fundo <select id="sem-ed-bg">
+            ${SEM_BG_OPTS.map(([v, l]) => `<option value="${v}"${(s.bg || "padrao") === v ? " selected" : ""}>${l}</option>`).join("")}
+          </select></label>
+        </div>
+      </div>
       <div id="sem-slides">${s.slides.map((sl, i) => slideEditorHtml(sl, i)).join("")}</div>
       <div class="row-actions">
         <button type="button" class="secondary" id="sem-add-slide">+ Adicionar slide</button>
@@ -1171,7 +1202,7 @@ function renderSeminarEditor(s) {
       const theme = $("#sem-ed-theme").value.trim();
       const style = $("#sem-ed-style").value;
       const updated = await api("/api/seminars/" + s.id, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme, slides, style }),
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme, slides, style, ...semMetaPayload("#sem-ed-") }),
       });
       currentSeminar = updated;
       renderSeminarEditor(updated);
@@ -1186,7 +1217,7 @@ function renderSeminarEditor(s) {
       const theme = $("#sem-ed-theme").value.trim();
       const style = $("#sem-ed-style").value;
       const updated = await api("/api/seminars/" + s.id, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme, slides, style, status: "aprovado" }),
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ theme, slides, style, status: "aprovado", ...semMetaPayload("#sem-ed-") }),
       });
       currentSeminar = updated;
       renderSeminarEditor(updated);

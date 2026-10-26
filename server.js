@@ -523,11 +523,12 @@ app.post("/api/seminars/:id/export", async (req, res) => {
 // Gera o áudio da narração completa dos slides em pt-BR e devolve os trechos
 // em MP3 para o navegador montar o vídeo.
 // Voz gratuita (padrão): Google Translate TTS, sem conta e sem chave, voz
-// única em pt-BR. Se OPENAI_API_KEY estiver no ambiente do servidor, usa
-// OpenAI TTS no lugar, com escolha de voz masculina ou feminina.
+// única em pt-BR. Se GEMINI_API_KEY estiver no ambiente do servidor, usa
+// Gemini TTS no lugar, com escolha de voz masculina ou feminina.
+// Regra permanente (2026-10-26): só Gemini, sem OpenAI, em todos os sistemas.
 // (A voz gratuita via Edge TTS foi abandonada em 2026-10-25: o endpoint
 // passou a recusar clientes de servidor com 403, na VM, no PC e via lib.)
-const NARRATE_VOICES_OPENAI = { masculina: "onyx", feminina: "nova" };
+const NARRATE_VOICES_GEMINI = { masculina: "Charon", feminina: "Kore" };
 function narrationTextOfSlide(sl) {
   if (!sl) return "";
   if (sl.type === "title") return [sl.title, sl.subtitle].filter(Boolean).join(". ");
@@ -548,21 +549,53 @@ function splitNarration(text, max = 3800) {
   if (cur) chunks.push(cur.trim());
   return chunks.filter(Boolean);
 }
-async function ttsMp3(text, voice) {
-  const r = await fetch("https://api.openai.com/v1/audio/speech", {
+// Gemini TTS: devolve PCM 24 kHz mono, que aqui é embrulhado em WAV
+// (o navegador toca WAV no <audio> do vídeo narrado, como tocava MP3).
+function pcmToWav(pcm, sampleRate = 24000) {
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + pcm.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(pcm.length, 40);
+  return Buffer.concat([header, pcm]);
+}
+async function geminiTtsWav(text, voiceName) {
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent", {
     method: "POST",
     headers: {
-      Authorization: "Bearer " + process.env.OPENAI_API_KEY,
+      "x-goog-api-key": process.env.GEMINI_API_KEY,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model: "tts-1", input: text, voice, response_format: "mp3" }),
+    body: JSON.stringify({
+      contents: [{ parts: [{ text }] }],
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        speechConfig: {
+          languageCode: "pt-BR",
+          voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+        },
+      },
+    }),
   });
   if (!r.ok) {
     let detail = "";
     try { const j = await r.json(); detail = (j.error && j.error.message) || ""; } catch { /* ignora */ }
-    throw new Error("Falha na geração da voz (HTTP " + r.status + ")" + (detail ? ": " + detail : ""));
+    throw new Error("Falha na geração da voz Gemini (HTTP " + r.status + ")" + (detail ? ": " + detail : ""));
   }
-  return Buffer.from(await r.arrayBuffer());
+  const j = await r.json();
+  const parts = (j.candidates && j.candidates[0] && j.candidates[0].content && j.candidates[0].content.parts) || [];
+  const b64 = (parts.find((p) => p.inlineData && p.inlineData.data) || {}).inlineData;
+  if (!b64 || !b64.data) throw new Error("O Gemini não devolveu áudio.");
+  return pcmToWav(Buffer.from(b64.data, "base64"));
 }
 // Voz gratuita via Google Translate TTS (sem conta, sem chave, voz única pt-BR).
 // O endpoint aceita ~200 caracteres por requisição; o texto é dividido em
@@ -596,8 +629,8 @@ async function googleTtsMp3(text) {
 app.post("/api/seminars/:id/narrate", async (req, res) => {
   try {
     const voiceKey = (req.body && req.body.voice) === "masculina" ? "masculina" : "feminina";
-    const useOpenAI = !!process.env.OPENAI_API_KEY;
-    const voice = useOpenAI ? NARRATE_VOICES_OPENAI[voiceKey] : null;
+    const useGemini = !!process.env.GEMINI_API_KEY;
+    const voice = useGemini ? NARRATE_VOICES_GEMINI[voiceKey] : null;
     let slides = Array.isArray(req.body && req.body.slides) ? req.body.slides : null;
     if (!slides) {
       const s = buildSeminar(req.params.id);
@@ -612,14 +645,14 @@ app.post("/api/seminars/:id/narrate", async (req, res) => {
       const text = narrationTextOfSlide(slides[i]);
       if (!text.trim()) continue;
       for (const chunk of splitNarration(text)) {
-        const mp3 = useOpenAI ? await ttsMp3(chunk, voice) : await googleTtsMp3(chunk);
-        const name = `narration-${req.params.id}-${stamp}-${n++}.mp3`;
-        fs.writeFileSync(path.join(UPLOAD_DIR, name), mp3);
+        const audio = useGemini ? await geminiTtsWav(chunk, voice) : await googleTtsMp3(chunk);
+        const name = `narration-${req.params.id}-${stamp}-${n++}.${useGemini ? "wav" : "mp3"}`;
+        fs.writeFileSync(path.join(UPLOAD_DIR, name), audio);
         parts.push({ slide: i, audio: `/uploads/${name}` });
       }
     }
     if (!parts.length) return res.status(400).json({ error: "Nenhum texto para narrar nos slides." });
-    res.json({ voice: voiceKey, provider: useOpenAI ? "openai" : "google", parts });
+    res.json({ voice: voiceKey, provider: useGemini ? "gemini" : "google", parts });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message || "Falha ao gerar a narração." });
